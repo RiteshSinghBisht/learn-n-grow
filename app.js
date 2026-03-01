@@ -47,6 +47,14 @@
     let currentUser = null;
     let currentPage = 'auth';
     let currentUid = null;
+    let activityState = null;
+    let activityEditingQuestionId = null;
+
+    // ---- Announcements State ----
+    let announcementsCache = [];
+
+    const ACTIVITY_SET_ID = 'modals_have_v1';
+    const ACTIVITY_VERSION = 1;
 
     // ---- Firestore Helpers ----
     function getUserDocRef() {
@@ -283,25 +291,36 @@
         lucide.createIcons();
         initAuth();
         initNav();
+        initActivity();
         initChat();
         initVoice();
         initFeedback();
         initProfile();
+        initAnnouncementBar();
         initScrollAnimations();
         fetchDailyContent();
         checkSession();
     });
 
     // ---- Session ----
+    function hideAppLoader() {
+        const loader = document.getElementById('app-loader');
+        if (!loader) return;
+        loader.classList.add('fade-out');
+        setTimeout(() => loader.remove(), 320);
+    }
+
     function checkSession() {
         // Firebase handles session automatically
         auth.onAuthStateChanged(async user => {
             if (user) {
                 currentUid = user.uid;
                 currentUser = {
+                    uid: user.uid,
                     name: user.displayName || user.email.split('@')[0],
                     email: user.email,
                     phone: user.photoURL || '',
+                    activityProgress: {}
                 };
 
                 // Load user data from Firestore
@@ -310,6 +329,7 @@
                     currentUser.fluentSessions = userData.fluentSessions || 0;
                     currentUser.khushiSessions = userData.khushiSessions || 0;
                     currentUser.profilePhoto = userData.profilePhoto || '';
+                    currentUser.activityProgress = userData.activityProgress || {};
 
                     // Use Firestore name if available (overrides Auth displayName/email)
                     if (userData.firstName) {
@@ -318,17 +338,17 @@
                     }
                 }
 
-                // Only navigate if on auth page
-                if (currentPage === 'auth') {
-                    navigateTo('dashboard');
-                }
+                navigateTo('dashboard');
             } else {
                 currentUser = null;
                 currentUid = null;
-                if (currentPage !== 'auth') {
-                    navigateTo('auth');
-                }
+                activityState = null;
+                activityEditingQuestionId = null;
+                navigateTo('auth');
             }
+
+            // Auth state resolved — hide the loader
+            hideAppLoader();
         });
     }
 
@@ -373,6 +393,9 @@
         if (page === 'chat-khushi') {
             incrementSession('khushi');
         }
+        if (page === 'activity-modals-have') {
+            openActivityPage();
+        }
         if (page === 'profile') {
             populateProfile();
         }
@@ -381,6 +404,15 @@
         window.scrollTo(0, 0);
     }
     window.navigateTo = navigateTo;
+
+    function activityBackClick() {
+        if (activityState && activityState.status === 'in_progress') {
+            $('#leave-test-modal')?.classList.add('open');
+        } else {
+            navigateTo('dashboard');
+        }
+    }
+    window.activityBackClick = activityBackClick;
 
     // ---- Auth ----
     function initAuth() {
@@ -538,6 +570,879 @@
             e.preventDefault();
             logout();
         });
+
+        // ---- Announcement Bell ----
+        const bellBtn = $('#announcement-bell');
+        const bellPopup = $('#announcement-popup');
+        const bellPopupClose = $('#announcement-popup-close');
+
+        if (bellBtn && bellPopup) {
+            bellBtn.addEventListener('click', e => {
+                e.stopPropagation();
+                bellPopup.classList.toggle('open');
+                // Close profile dropdown if open
+                dropdown.classList.remove('open');
+            });
+
+            bellPopupClose.addEventListener('click', () => {
+                bellPopup.classList.remove('open');
+            });
+
+            document.addEventListener('click', () => {
+                bellPopup.classList.remove('open');
+            });
+
+            bellPopup.addEventListener('click', e => {
+                e.stopPropagation();
+            });
+        }
+    }
+
+    // ---- Update Announcement Badge ----
+    function updateAnnouncementBadge() {
+        const badge = $('#announcement-badge');
+        const bell = $('#announcement-bell');
+        if (!badge || !bell) return;
+
+        const count = announcementsCache.length;
+        if (count > 0) {
+            badge.textContent = count > 99 ? '99+' : count;
+            badge.style.display = 'flex';
+            bell.style.display = 'flex';
+        } else {
+            // For testing: show bell with "!" if no announcements
+            // In production, you can hide it: badge.style.display = 'none';
+            badge.style.display = 'none';
+            bell.style.display = 'flex'; // Always show bell for testing
+        }
+    }
+
+    // ---- Populate Announcement Popup ----
+    function populateAnnouncementPopup() {
+        const popupList = $('#announcement-popup-list');
+        const popupEmpty = $('#announcement-popup-empty');
+        if (!popupList || !popupEmpty) return;
+
+        if (announcementsCache.length === 0) {
+            popupList.style.display = 'none';
+            popupEmpty.style.display = 'block';
+            return;
+        }
+
+        popupList.style.display = 'block';
+        popupEmpty.style.display = 'none';
+
+        popupList.innerHTML = announcementsCache.map(a => {
+            const date = new Date(a.date);
+            const dateStr = date.toLocaleDateString('en-IN', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric'
+            });
+            return `
+                <div class="announcement-popup-item" onclick="showAnnouncementDetail('${escapeHTML(a.id)}')">
+                    <div class="announcement-popup-item-title">${escapeHTML(a.title)}</div>
+                    <div class="announcement-popup-item-message">${escapeHTML(a.message)}</div>
+                    <div class="announcement-popup-item-date">${dateStr}</div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    // ---- Show Announcement Detail ----
+    window.showAnnouncementDetail = function(id) {
+        const announcement = announcementsCache.find(a => a.id === id);
+        if (!announcement) return;
+
+        const date = new Date(announcement.date);
+        const dateStr = date.toLocaleDateString('en-IN', {
+            weekday: 'long',
+            day: '2-digit',
+            month: 'long',
+            year: 'numeric'
+        });
+
+        // Create a simple alert for now - could be upgraded to a modal
+        alert(`${announcement.title}\n\n${announcement.message}\n\nDate: ${dateStr}`);
+    };
+
+    // ---- Activity (Past Modals) ----
+    const N8N_ACTIVITY_REPORT_WEBHOOK = 'https://n8n.ritesh-ai-automation.in/webhook/activity-modals-report';
+    const ACTIVITY_MODAL_OPTIONS = [
+        'could have',
+        "couldn't have",
+        'should have',
+        "shouldn't have",
+        'would have',
+        "wouldn't have"
+    ];
+    const ACTIVITY_CONTEXT_STYLES = {
+        'past possibility': { bg: 'bg-blue', text: 'text-blue', border: 'border-blue' },
+        'past negative possibility': { bg: 'bg-purple', text: 'text-purple', border: 'border-purple' },
+        'past advice / regret': { bg: 'bg-green', text: 'text-green', border: 'border-green' },
+        'past negative advice / regret': { bg: 'bg-red', text: 'text-red', border: 'border-red' },
+        'past willingness': { bg: 'bg-orange', text: 'text-orange', border: 'border-orange' },
+    };
+    const ACTIVITY_HINTS = {
+        'past possibility': "Use 'could have + past participle' for something that was possible but did not happen.",
+        'past negative possibility': "Use 'couldn't have + past participle' for something that was not possible.",
+        'past advice / regret': "Use 'should have + past participle' for something that would have been better to do.",
+        'past negative advice / regret': "Use 'shouldn't have + past participle' for something that was a mistake.",
+        'past willingness': "Use 'would have + past participle' for willingness blocked by circumstances.",
+    };
+
+    function getActivitySet() {
+        if (typeof ACTIVITY_SETS === 'undefined') return null;
+        return ACTIVITY_SETS[ACTIVITY_SET_ID] || null;
+    }
+
+    function initActivity() {
+        // Leave-test modal — wire these first, independent of other elements
+        const leaveModal = $('#leave-test-modal');
+        $('#leave-test-cancel')?.addEventListener('click', () => leaveModal?.classList.remove('open'));
+        $('#leave-test-confirm')?.addEventListener('click', () => {
+            leaveModal?.classList.remove('open');
+            navigateTo('dashboard');
+        });
+
+        const checkBtn = $('#check-btn');
+        const nextBtn = $('#next-btn');
+        const prevBtn = $('#prev-btn');
+        const editBtn = $('#result-edit-btn');
+        const resetBtn = $('#reset-btn');
+        const tryAgainBtn = $('#try-again-btn');
+        const retryBtn = $('#activity-report-retry-btn');
+        const hintBtn = $('#hint-btn');
+
+        if (!checkBtn || !nextBtn || !prevBtn || !editBtn || !hintBtn) return;
+
+        buildActivityQuickNav();
+
+        checkBtn.addEventListener('click', submitCurrentActivityAnswer);
+        nextBtn.addEventListener('click', handleActivityNext);
+        prevBtn.addEventListener('click', handleActivityPrev);
+        editBtn.addEventListener('click', enableActivityEditMode);
+        resetBtn?.addEventListener('click', resetActivityProgress);
+        tryAgainBtn?.addEventListener('click', resetActivityProgress);
+        retryBtn?.addEventListener('click', () => requestActivityReport(true));
+        hintBtn.addEventListener('click', toggleCurrentHint);
+        // Note: answer-input listeners are attached dynamically in renderCurrentActivityQuestion
+    }
+
+    function openActivityPage() {
+        const set = getActivitySet();
+        if (!set) {
+            showToast('Activity data is missing. Please reload.');
+            return;
+        }
+
+        if (!currentUser || !currentUid) {
+            showToast('Please sign in to access activities.');
+            navigateTo('auth');
+            return;
+        }
+
+        if (!activityState || activityState.setId !== ACTIVITY_SET_ID) {
+            const stored = currentUser?.activityProgress?.[ACTIVITY_SET_ID];
+            activityState = hydrateActivityState(stored, set);
+        }
+
+        buildActivityQuickNav();
+        activityEditingQuestionId = null;
+        renderActivity();
+
+        if (activityState.status === 'completed' && !activityState.report && activityState.reportStatus !== 'loading') {
+            requestActivityReport(false);
+        }
+    }
+
+    function createDefaultActivityState(set) {
+        const now = new Date().toISOString();
+        return {
+            version: ACTIVITY_VERSION,
+            setId: set.id,
+            status: 'in_progress',
+            currentIndex: 0,
+            answersById: {},
+            submittedCount: 0,
+            correctCount: 0,
+            startedAt: now,
+            updatedAt: now,
+            completedAt: null,
+            report: null,
+            reportStatus: 'idle'
+        };
+    }
+
+    function hydrateActivityState(stored, set) {
+        if (!stored || typeof stored !== 'object') {
+            return createDefaultActivityState(set);
+        }
+
+        const state = createDefaultActivityState(set);
+        state.version = ACTIVITY_VERSION;
+        state.setId = set.id;
+        state.status = stored.status === 'completed' ? 'completed' : 'in_progress';
+        state.currentIndex = Number.isInteger(stored.currentIndex) ? stored.currentIndex : 0;
+        state.answersById = (stored.answersById && typeof stored.answersById === 'object') ? { ...stored.answersById } : {};
+        state.startedAt = stored.startedAt || state.startedAt;
+        state.updatedAt = stored.updatedAt || state.updatedAt;
+        state.completedAt = stored.completedAt || null;
+        state.report = stored.report || null;
+        state.reportStatus = state.report ? 'success' : 'idle';
+
+        recalculateActivityMetrics(state, set);
+        state.currentIndex = Math.max(0, Math.min(state.currentIndex, set.totalQuestions - 1));
+
+        if (state.submittedCount >= set.totalQuestions) {
+            state.status = 'completed';
+            state.completedAt = state.completedAt || new Date().toISOString();
+        }
+
+        return state;
+    }
+
+    function recalculateActivityMetrics(state, set) {
+        let submittedCount = 0;
+        let correctCount = 0;
+
+        set.questions.forEach(q => {
+            const answer = state.answersById?.[String(q.id)];
+            if (!answer || typeof answer.normalizedInput !== 'string' || !answer.normalizedInput) return;
+            submittedCount += 1;
+            if (answer.isCorrect) correctCount += 1;
+        });
+
+        state.submittedCount = submittedCount;
+        state.correctCount = correctCount;
+    }
+
+    function getCurrentActivityQuestion() {
+        const set = getActivitySet();
+        if (!set || !activityState) return null;
+        return set.questions[activityState.currentIndex] || null;
+    }
+
+    function getActivityAnswer(questionId) {
+        if (!activityState) return null;
+        return activityState.answersById?.[String(questionId)] || null;
+    }
+
+    function extractVerbFromPrompt(prompt) {
+        const match = (prompt || '').match(/\(([^)]+)\)/);
+        return match?.[1] || '';
+    }
+
+    function parseAnswerParts(rawInput = '') {
+        const normalized = canonicalizeNegativeModalPrefix(normalizeAnswer(rawInput));
+        for (const option of [...ACTIVITY_MODAL_OPTIONS].sort((a, b) => b.length - a.length)) {
+            if (normalized === option) return { modal: option, verb: '' };
+            if (normalized.startsWith(`${option} `)) {
+                return { modal: option, verb: normalized.slice(option.length + 1) };
+            }
+        }
+        return { modal: '', verb: normalized };
+    }
+
+    function formatQuestionWithBlank(prompt, answerText = '', showInput = false) {
+        if (showInput) {
+            const blank = `<input type="text" id="answer-input" class="inline-blank-input" placeholder="type here..." autocomplete="off" spellcheck="false">`;
+            if (/_{2,}/.test(prompt)) return escapeHTML(prompt).replace(/_{2,}/g, blank);
+            return `${escapeHTML(prompt)} ${blank}`;
+        }
+        const blankText = answerText ? escapeHTML(answerText) : '_______';
+        const blank = `<span class="blank">${blankText}</span>`;
+        if (/_{2,}/.test(prompt)) return escapeHTML(prompt).replace(/_{2,}/g, blank);
+        return `${escapeHTML(prompt)} ${blank}`;
+    }
+
+    function buildActivityQuickNav() {
+        const set = getActivitySet();
+        const quickNav = $('#quick-nav');
+        if (!set || !quickNav) return;
+
+        quickNav.innerHTML = '';
+        set.questions.forEach((q, index) => {
+            const btn = document.createElement('button');
+            btn.className = 'quick-nav-btn';
+            btn.type = 'button';
+            btn.textContent = String(index + 1);
+            btn.addEventListener('click', () => goToActivityQuestion(index));
+            quickNav.appendChild(btn);
+        });
+    }
+
+    function updateActivityQuickNav() {
+        const set = getActivitySet();
+        const quickNav = $('#quick-nav');
+        if (!set || !quickNav || !activityState) return;
+
+        const buttons = [...quickNav.querySelectorAll('.quick-nav-btn')];
+        buttons.forEach((btn, index) => {
+            const q = set.questions[index];
+            const answer = getActivityAnswer(q.id);
+
+            btn.classList.remove('current', 'answered', 'correct', 'wrong');
+            if (index === activityState.currentIndex && activityState.status !== 'completed') btn.classList.add('current');
+            if (answer) {
+                btn.classList.add('answered');
+                btn.classList.add(answer.isCorrect ? 'correct' : 'wrong');
+            }
+        });
+    }
+
+    function renderActivity() {
+        const set = getActivitySet();
+        if (!set || !activityState) return;
+
+        const titleEl = $('#activity-title');
+        const subtitleEl = $('#activity-subtitle');
+        const badgeEl = $('#activity-badge');
+        const progressTextEl = $('#progress-text');
+        const scoreTextEl = $('#activity-score-text');
+        const progressFillEl = $('#progress-fill');
+        const quizContainer = $('#quiz-container');
+        const resultsContainer = $('#results-container');
+
+        if (titleEl) titleEl.textContent = 'Past Modals Exercise';
+        if (subtitleEl) subtitleEl.textContent = 'Could Have / Should Have / Would Have';
+
+        const progressRatio = Math.max(0, Math.min(1, activityState.submittedCount / set.totalQuestions));
+        if (progressFillEl) progressFillEl.style.width = `${Math.round(progressRatio * 100)}%`;
+        if (progressTextEl) progressTextEl.textContent = `${Math.min(activityState.currentIndex + 1, set.totalQuestions)} / ${set.totalQuestions}`;
+        if (scoreTextEl) scoreTextEl.textContent = `Score: ${activityState.correctCount}/${set.totalQuestions}`;
+
+        if (activityState.status === 'completed') {
+            if (badgeEl) {
+                badgeEl.textContent = 'Completed';
+                badgeEl.classList.add('completed');
+            }
+            if (quizContainer) quizContainer.classList.add('hidden');
+            if (resultsContainer) resultsContainer.classList.remove('hidden');
+            renderActivityCompletion();
+            updateActivityQuickNav();
+            return;
+        }
+
+        if (badgeEl) {
+            badgeEl.textContent = 'In Progress';
+            badgeEl.classList.remove('completed');
+        }
+
+        if (quizContainer) quizContainer.classList.remove('hidden');
+        if (resultsContainer) resultsContainer.classList.add('hidden');
+        renderCurrentActivityQuestion();
+    }
+
+    function renderCurrentActivityQuestion() {
+        const question = getCurrentActivityQuestion();
+        if (!question) return;
+
+        const set = getActivitySet();
+        const contextBadge = $('#context-badge');
+        const questionText = $('#question-text');
+        const verbHint = $('#verb-hint');
+        const inputArea = $('#input-area');
+        const resultArea = $('#result-area');
+        const hintBox = $('#hint-box');
+        const prevBtn = $('#prev-btn');
+        const progressText = $('#progress-text');
+        const progressFill = $('#progress-fill');
+
+        const answer = getActivityAnswer(question.id);
+        const isEditing = activityEditingQuestionId === question.id;
+        const contextStyle = ACTIVITY_CONTEXT_STYLES[question.category] || ACTIVITY_CONTEXT_STYLES['past possibility'];
+
+        if (progressText && set) progressText.textContent = `${activityState.currentIndex + 1} / ${set.totalQuestions}`;
+        if (progressFill && set) progressFill.style.width = `${((activityState.currentIndex + 1) / set.totalQuestions) * 100}%`;
+
+        if (contextBadge) {
+            contextBadge.className = `context-badge ${contextStyle.bg} ${contextStyle.text} ${contextStyle.border}`;
+            contextBadge.textContent = question.category;
+        }
+
+        const showInput = !answer || isEditing;
+        if (questionText) {
+            const filled = answer && !isEditing ? answer.rawInput : '';
+            questionText.innerHTML = formatQuestionWithBlank(question.prompt, filled, showInput);
+
+            // Wire the inline input that was just injected into the DOM
+            if (showInput) {
+                const inlineInput = questionText.querySelector('#answer-input');
+                if (inlineInput) {
+                    inlineInput.value = isEditing ? (answer?.rawInput || '') : '';
+                    inlineInput.addEventListener('input', updateActivityActionState);
+                    inlineInput.addEventListener('keydown', e => {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            const checkBtn = $('#check-btn');
+                            if (checkBtn && !checkBtn.disabled) submitCurrentActivityAnswer();
+                        }
+                    });
+                    inlineInput.focus();
+                }
+            }
+        }
+
+        if (verbHint) verbHint.textContent = `(${extractVerbFromPrompt(question.prompt)})`;
+
+        if (inputArea && resultArea) {
+            if (answer && !isEditing) {
+                inputArea.classList.add('hidden');
+                resultArea.classList.remove('hidden');
+                renderAnswerResult(answer, question);
+            } else {
+                inputArea.classList.remove('hidden');
+                resultArea.classList.add('hidden');
+            }
+        }
+
+        if (hintBox) {
+            hintBox.classList.add('hidden');
+            hintBox.textContent = '';
+        }
+
+        if (prevBtn) prevBtn.disabled = activityState.currentIndex === 0;
+        updateActivityActionState();
+        updateActivityQuickNav();
+    }
+
+    function renderAnswerResult(answer, question) {
+        const resultBox = $('#result-box');
+        const resultTitle = $('#result-title');
+        const resultExplanation = $('#result-explanation');
+        const nextBtn = $('#next-btn');
+
+        const isCorrect = !!answer?.isCorrect;
+
+        if (resultBox) {
+            resultBox.className = `result-box ${isCorrect ? 'result-correct' : 'result-incorrect'}`;
+        }
+
+        if (resultTitle) {
+            resultTitle.textContent = isCorrect ? 'Correct' : 'Not quite right';
+        }
+
+        if (resultExplanation) {
+            let html = '';
+            if (!isCorrect) {
+                html += `<p style="margin-bottom:8px;">Correct answer: <strong class="text-correct">${escapeHTML(question.expectedPhrase)}</strong></p>`;
+            }
+            html += `<p><strong>Model sentence:</strong> ${escapeHTML(question.modelSentence)}</p>`;
+            resultExplanation.innerHTML = html;
+        }
+
+        if (nextBtn) {
+            const isLast = activityState.currentIndex >= (getActivitySet()?.totalQuestions || 1) - 1;
+            nextBtn.textContent = isLast ? 'View Results' : 'Next Question →';
+        }
+    }
+
+    function updateActivityActionState() {
+        const question = getCurrentActivityQuestion();
+        if (!question || !activityState) return;
+
+        const answerInput = $('#answer-input');
+        const checkBtn = $('#check-btn');
+        const prevBtn = $('#prev-btn');
+        if (!checkBtn) return;
+
+        const answer = getActivityAnswer(question.id);
+        const isSubmitted = !!answer;
+        const isEditing = activityEditingQuestionId === question.id;
+        const hasInput = answerInput ? answerInput.value.trim().length > 0 : false;
+
+        if (isSubmitted && !isEditing) {
+            checkBtn.disabled = true;
+        } else {
+            checkBtn.disabled = !hasInput;
+        }
+
+        if (prevBtn) prevBtn.disabled = activityState.currentIndex === 0;
+    }
+
+    function normalizeAnswer(text) {
+        return (text || '')
+            .toLowerCase()
+            .replace(/[’`]/g, "'")
+            .replace(/\s+/g, ' ')
+            .trim()
+            .replace(/[.,!?;:]+$/g, '')
+            .trim();
+    }
+
+    function canonicalizeNegativeModalPrefix(text = '') {
+        return (text || '')
+            .replace(/^could not have\b/, "couldn't have")
+            .replace(/^should not have\b/, "shouldn't have")
+            .replace(/^would not have\b/, "wouldn't have")
+            .replace(/^couldnt have\b/, "couldn't have")
+            .replace(/^shouldnt have\b/, "shouldn't have")
+            .replace(/^wouldnt have\b/, "wouldn't have");
+    }
+
+    function normalizeActivityPhraseForCompare(text = '') {
+        return canonicalizeNegativeModalPrefix(normalizeAnswer(text));
+    }
+
+    function submitCurrentActivityAnswer() {
+        const set = getActivitySet();
+        const question = getCurrentActivityQuestion();
+        const answerInput = $('#answer-input');
+        if (!set || !question || !answerInput || !activityState) return;
+
+        const rawInput = answerInput.value.trim();
+        if (!rawInput) {
+            showToast('Please type your answer.');
+            return;
+        }
+
+        const { modal: selectedModal, verb: verbPart } = parseAnswerParts(rawInput);
+        const normalizedInput = normalizeAnswer(rawInput);
+        const normalizedInputForCompare = normalizeActivityPhraseForCompare(rawInput);
+        const normalizedExpectedForCompare = normalizeActivityPhraseForCompare(question.normalizedExpectedPhrase || question.expectedPhrase);
+        const isCorrect = normalizedInputForCompare === normalizedExpectedForCompare;
+
+        activityState.answersById[String(question.id)] = {
+            rawInput,
+            normalizedInput,
+            normalizedInputForCompare,
+            isCorrect,
+            selectedModal,
+            verbPart,
+            submittedAt: new Date().toISOString()
+        };
+
+        recalculateActivityMetrics(activityState, set);
+        activityEditingQuestionId = null;
+
+        if (activityState.submittedCount >= set.totalQuestions) {
+            activityState.status = 'completed';
+            activityState.completedAt = activityState.completedAt || new Date().toISOString();
+        }
+
+        persistActivityProgress();
+        renderCurrentActivityQuestion();
+        renderActivity();
+
+        if (activityState.status === 'completed' && !activityState.report && activityState.reportStatus !== 'loading') {
+            requestActivityReport(false);
+        }
+    }
+
+    function enableActivityEditMode() {
+        const question = getCurrentActivityQuestion();
+        const answer = question ? getActivityAnswer(question.id) : null;
+        if (!question || !answer) return;
+
+        activityEditingQuestionId = question.id;
+        renderCurrentActivityQuestion();
+
+        const answerInput = $('#answer-input');
+        if (answerInput) {
+            answerInput.focus();
+            answerInput.setSelectionRange(answerInput.value.length, answerInput.value.length);
+        }
+    }
+
+    function toggleCurrentHint() {
+        const question = getCurrentActivityQuestion();
+        const hintBox = $('#hint-box');
+        if (!question || !hintBox) return;
+
+        if (!hintBox.classList.contains('hidden')) {
+            hintBox.classList.add('hidden');
+            hintBox.textContent = '';
+            return;
+        }
+
+        const hint = ACTIVITY_HINTS[question.category] || 'Use the category clue to choose the correct modal phrase.';
+        hintBox.textContent = `Tip: ${hint}`;
+        hintBox.classList.remove('hidden');
+    }
+
+    function handleActivityNext() {
+        const set = getActivitySet();
+        const question = getCurrentActivityQuestion();
+        if (!set || !question || !activityState) return;
+
+        const answer = getActivityAnswer(question.id);
+        if (!answer) {
+            showToast('Submit this answer before moving next.');
+            return;
+        }
+
+        if (activityState.currentIndex < set.totalQuestions - 1) {
+            activityState.currentIndex += 1;
+            activityEditingQuestionId = null;
+            persistActivityProgress();
+            renderActivity();
+            return;
+        }
+
+        if (activityState.submittedCount >= set.totalQuestions) {
+            activityState.status = 'completed';
+            activityState.completedAt = activityState.completedAt || new Date().toISOString();
+            persistActivityProgress();
+            renderActivity();
+            if (!activityState.report && activityState.reportStatus !== 'loading') {
+                requestActivityReport(false);
+            }
+        }
+    }
+
+    function handleActivityPrev() {
+        if (!activityState || activityState.currentIndex === 0) return;
+        activityState.currentIndex -= 1;
+        activityEditingQuestionId = null;
+        persistActivityProgress();
+        renderActivity();
+    }
+
+    function goToActivityQuestion(index) {
+        const set = getActivitySet();
+        if (!set || !activityState) return;
+        if (index < 0 || index >= set.totalQuestions) return;
+
+        activityState.currentIndex = index;
+        activityEditingQuestionId = null;
+        persistActivityProgress();
+        renderActivity();
+    }
+
+    function renderActivityCompletion() {
+        const set = getActivitySet();
+        if (!set || !activityState) return;
+
+        const scorePercentEl = $('#score-percent');
+        const scoreCircleEl = $('#score-circle');
+        const resultsTitleEl = $('#results-title');
+        const resultsSubtitleEl = $('#results-subtitle');
+        const reviewListEl = $('#review-list');
+
+        const total = set.totalQuestions;
+        const correct = activityState.correctCount;
+        const percentage = Math.round((correct / total) * 100);
+
+        if (scorePercentEl) scorePercentEl.textContent = `${percentage}%`;
+
+        if (scoreCircleEl) {
+            scoreCircleEl.className = 'score-circle';
+            if (percentage >= 80) scoreCircleEl.classList.add('score-excellent');
+            else if (percentage >= 60) scoreCircleEl.classList.add('score-good');
+            else scoreCircleEl.classList.add('score-poor');
+        }
+
+        if (resultsTitleEl) {
+            if (percentage >= 80) resultsTitleEl.textContent = 'Excellent';
+            else if (percentage >= 60) resultsTitleEl.textContent = 'Good Job';
+            else resultsTitleEl.textContent = 'Keep Practicing';
+        }
+        if (resultsSubtitleEl) {
+            resultsSubtitleEl.textContent = `You got ${correct} out of ${total} questions correct`;
+        }
+
+        if (reviewListEl) {
+            reviewListEl.innerHTML = set.questions.map((q, index) => {
+                const answer = getActivityAnswer(q.id);
+                const userAnswer = answer?.rawInput || 'Not answered';
+                const isCorrect = !!answer?.isCorrect;
+
+                return `
+                    <div class="review-item ${isCorrect ? 'review-correct' : 'review-incorrect'}">
+                        <div class="review-header">
+                            <div class="review-icon">${isCorrect ? '✓' : '✗'}</div>
+                            <div class="review-content">
+                                <p><strong>Q${index + 1}:</strong> ${escapeHTML(q.prompt).replace(/_{2,}/g, '_____')}</p>
+                                <p class="review-answer">Your answer: <span class="${isCorrect ? 'text-correct' : 'text-incorrect'}">${escapeHTML(userAnswer)}</span></p>
+                                ${!isCorrect ? `<p class="review-answer">Correct: <span class="text-correct">${escapeHTML(q.expectedPhrase)}</span></p>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        updateActivityQuickNav();
+        renderActivityReport();
+    }
+
+    function buildActivityReportPayload() {
+        const set = getActivitySet();
+        if (!set || !activityState) return null;
+
+        const total = set.totalQuestions;
+        const correct = activityState.correctCount;
+        const accuracy = Math.round((correct / total) * 100);
+
+        const attempts = set.questions.map(q => {
+            const answer = getActivityAnswer(q.id);
+            return {
+                question_id: q.id,
+                category: q.category,
+                expected_phrase: q.expectedPhrase,
+                user_input: answer?.rawInput || '',
+                is_correct: !!answer?.isCorrect
+            };
+        });
+
+        return {
+            activity_id: set.id,
+            chat_id: currentUid || 'anonymous',
+            user_meta: {
+                uid: currentUid || 'anonymous',
+                name: currentUser?.name || 'Guest',
+                email: currentUser?.email || ''
+            },
+            summary: {
+                total,
+                correct,
+                accuracy_percent: accuracy
+            },
+            attempts
+        };
+    }
+
+    async function requestActivityReport(forceRetry = false) {
+        if (!activityState || activityState.status !== 'completed') return;
+        if (activityState.reportStatus === 'loading') return;
+        if (activityState.report && !forceRetry) return;
+
+        const payload = buildActivityReportPayload();
+        if (!payload) return;
+
+        activityState.reportStatus = 'loading';
+        renderActivityReport();
+
+        try {
+            const res = await fetch(N8N_ACTIVITY_REPORT_WEBHOOK, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+            const contentType = res.headers.get('content-type') || '';
+            let data;
+
+            if (contentType.includes('application/json')) {
+                data = await res.json();
+            } else {
+                data = { text: await res.text() };
+            }
+
+            const reportText = (data?.report_text || data?.text || data?.reply || data?.output || '').toString().trim();
+            const reportHtml = (data?.report_html || data?.html || '').toString().trim();
+            const fallback = !reportText && !reportHtml ? JSON.stringify(data, null, 2) : '';
+
+            activityState.report = {
+                generatedAt: new Date().toISOString(),
+                text: reportText || fallback,
+                html: reportHtml || null
+            };
+            activityState.reportStatus = 'success';
+
+            await persistActivityProgress();
+            renderActivity();
+        } catch (err) {
+            console.error('Activity report error:', err);
+            activityState.reportStatus = 'failed';
+            renderActivityReport();
+            showToast('Report generation failed. You can retry.');
+        }
+    }
+
+    function renderActivityReport() {
+        if (!activityState) return;
+
+        const statusEl = $('#activity-report-status');
+        const contentEl = $('#activity-report-content');
+        const retryBtn = $('#activity-report-retry-btn');
+        if (!statusEl || !contentEl || !retryBtn) return;
+
+        retryBtn.style.display = 'none';
+
+        if (activityState.reportStatus === 'loading') {
+            statusEl.textContent = 'Generating report...';
+            contentEl.innerHTML = '';
+            return;
+        }
+
+        if (activityState.report) {
+            const ts = new Date(activityState.report.generatedAt).toLocaleString('en-US', {
+                month: 'short',
+                day: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            statusEl.textContent = `Generated on ${ts}`;
+            if (activityState.report.html) {
+                contentEl.innerHTML = activityState.report.html;
+            } else {
+                contentEl.textContent = activityState.report.text || 'Report generated successfully.';
+            }
+            return;
+        }
+
+        if (activityState.reportStatus === 'failed') {
+            statusEl.textContent = 'Could not generate report right now.';
+            contentEl.textContent = 'You can continue with your score summary and try generating the report again.';
+            retryBtn.style.display = 'inline-flex';
+            return;
+        }
+
+        statusEl.textContent = 'Report not generated yet.';
+        contentEl.textContent = '';
+        retryBtn.style.display = 'inline-flex';
+    }
+
+    function resetActivityProgress() {
+        const set = getActivitySet();
+        if (!set) return;
+
+        activityState = createDefaultActivityState(set);
+        activityEditingQuestionId = null;
+        persistActivityProgress();
+        renderActivity();
+        showToast('Activity restarted.');
+    }
+
+    function serializeActivityState(state) {
+        return {
+            version: ACTIVITY_VERSION,
+            setId: state.setId,
+            status: state.status,
+            currentIndex: state.currentIndex,
+            answersById: state.answersById,
+            submittedCount: state.submittedCount,
+            correctCount: state.correctCount,
+            startedAt: state.startedAt,
+            updatedAt: state.updatedAt,
+            completedAt: state.completedAt || null,
+            report: state.report || null
+        };
+    }
+
+    async function persistActivityProgress() {
+        if (!currentUid || !activityState) return;
+
+        activityState.updatedAt = new Date().toISOString();
+        const serialized = serializeActivityState(activityState);
+
+        try {
+            await updateUserData({
+                activityProgress: {
+                    [ACTIVITY_SET_ID]: serialized
+                }
+            });
+
+            if (!currentUser.activityProgress) currentUser.activityProgress = {};
+            currentUser.activityProgress[ACTIVITY_SET_ID] = serialized;
+        } catch (err) {
+            console.error('Activity progress save error:', err);
+        }
     }
 
     // ---- Dashboard ----
@@ -573,6 +1478,11 @@
         // Daily Vocabulary
         // Daily Vocabulary
         // populateVocabulary(); // Moved to fetchDailyContent fallback
+
+        // Load and render announcements
+        loadAnnouncements().then(() => {
+            renderAnnouncementBar();
+        });
     }
 
     // ---- Daily Vocabulary ----
@@ -1918,6 +2828,108 @@
         toast.textContent = msg;
         toast.classList.add('show');
         setTimeout(() => toast.classList.remove('show'), 2800);
+    }
+
+    // ---- Announcements (Supabase Direct Read) ----
+    async function loadAnnouncements() {
+        try {
+            // Get Supabase client from window
+            const supabaseClient = window.supabase;
+            if (!supabaseClient) {
+                console.warn('Supabase client not loaded yet');
+                // Retry after a short delay
+                setTimeout(loadAnnouncements, 500);
+                return;
+            }
+
+            console.log('Fetching announcements from Supabase...'); // Debug log
+
+            // Fetch directly from Supabase
+            const { data, error } = await supabaseClient
+                .from('announcements')
+                .select('*')
+                .order('date', { ascending: false });
+
+            console.log('Supabase response:', data, error); // Debug log
+
+            if (error) {
+                console.error('Supabase error:', error);
+                announcementsCache = [];
+                updateAnnouncementBadge();
+                populateAnnouncementPopup();
+                return;
+            }
+
+            if (data && data.length > 0) {
+                announcementsCache = data.map(item => {
+                    // Handle date parsing - Supabase returns date as YYYY-MM-DD string
+                    let parsedDate = new Date();
+                    if (item.date) {
+                        // Parse date in YYYY-MM-DD format
+                        const dateParts = item.date.split('-');
+                        if (dateParts.length === 3) {
+                            parsedDate = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
+                        } else {
+                            parsedDate = new Date(item.date);
+                        }
+                    }
+
+                    return {
+                        id: item.id,
+                        title: item.title || '',
+                        message: item.message || '',
+                        date: parsedDate,
+                        createdAt: item.created_at ? new Date(item.created_at) : new Date()
+                    };
+                });
+                // Update bell badge and popup
+                console.log('Announcements loaded:', announcementsCache.length); // Debug log
+                updateAnnouncementBadge();
+                populateAnnouncementPopup();
+                // Refresh icons
+                if (window.lucide) lucide.createIcons();
+            } else {
+                announcementsCache = [];
+                console.log('No announcements data'); // Debug log
+                updateAnnouncementBadge();
+                populateAnnouncementPopup();
+            }
+        } catch (err) {
+            console.error('Failed to load announcements:', err);
+            announcementsCache = [];
+            updateAnnouncementBadge();
+            populateAnnouncementPopup();
+        }
+    }
+
+    function renderAnnouncementBar() {
+        const bar = $('#announcement-bar');
+        const list = $('#announcement-list');
+        if (!bar || !list) return;
+
+        if (announcementsCache.length === 0) {
+            bar.style.display = 'none';
+            return;
+        }
+
+        list.innerHTML = announcementsCache.map(a => {
+            const dateStr = a.date.toLocaleDateString('en-GB', {
+                day: '2-digit', month: 'short', year: 'numeric'
+            });
+            return `<div class="announcement-item">
+                <div class="announcement-item-title">${escapeHTML(a.title)}</div>
+                <div class="announcement-item-message">${escapeHTML(a.message)}</div>
+                <div class="announcement-item-date">${escapeHTML(dateStr)}</div>
+            </div>`;
+        }).join('');
+
+        bar.style.display = 'block';
+        if (window.lucide) lucide.createIcons();
+    }
+
+    function initAnnouncementBar() {
+        const dismissBtn = $('#announcement-dismiss');
+        if (dismissBtn) dismissBtn.style.display = 'none';
     }
 
 })();
