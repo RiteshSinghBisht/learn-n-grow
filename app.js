@@ -52,6 +52,8 @@
 
     // ---- Announcements State ----
     let announcementsCache = [];
+    let announcementsRefreshTimer = null;
+    const ANNOUNCEMENTS_REFRESH_MS = 60000;
 
     const ACTIVITY_SET_ID = 'modals_have_v1';
     const ACTIVITY_VERSION = 1;
@@ -344,6 +346,7 @@
                 currentUid = null;
                 activityState = null;
                 activityEditingQuestionId = null;
+                stopAnnouncementsAutoRefresh();
                 navigateTo('auth');
             }
 
@@ -581,7 +584,7 @@
                 e.stopPropagation();
                 bellPopup.classList.toggle('open');
                 // Close profile dropdown if open
-                dropdown.classList.remove('open');
+                if (dropdown) dropdown.classList.remove('open');
             });
 
             bellPopupClose.addEventListener('click', () => {
@@ -1479,10 +1482,9 @@
         // Daily Vocabulary
         // populateVocabulary(); // Moved to fetchDailyContent fallback
 
-        // Load and render announcements
-        loadAnnouncements().then(() => {
-            renderAnnouncementBar();
-        });
+        // Load announcements and keep them fresh on dashboard
+        loadAnnouncements();
+        startAnnouncementsAutoRefresh();
     }
 
     // ---- Daily Vocabulary ----
@@ -2831,26 +2833,36 @@
     }
 
     // ---- Announcements (Supabase Direct Read) ----
+    function startAnnouncementsAutoRefresh() {
+        if (announcementsRefreshTimer) return;
+        announcementsRefreshTimer = setInterval(() => {
+            if (!currentUser || currentPage !== 'dashboard') return;
+            loadAnnouncements();
+        }, ANNOUNCEMENTS_REFRESH_MS);
+    }
+
+    function stopAnnouncementsAutoRefresh() {
+        if (!announcementsRefreshTimer) return;
+        clearInterval(announcementsRefreshTimer);
+        announcementsRefreshTimer = null;
+    }
+
     async function loadAnnouncements() {
         try {
             // Get Supabase client from window
             const supabaseClient = window.supabase;
-            if (!supabaseClient) {
-                console.warn('Supabase client not loaded yet');
+            if (!supabaseClient || typeof supabaseClient.from !== 'function') {
+                console.warn('Supabase client not ready yet');
                 // Retry after a short delay
                 setTimeout(loadAnnouncements, 500);
                 return;
             }
-
-            console.log('Fetching announcements from Supabase...'); // Debug log
 
             // Fetch directly from Supabase
             const { data, error } = await supabaseClient
                 .from('announcements')
                 .select('*')
                 .order('date', { ascending: false });
-
-            console.log('Supabase response:', data, error); // Debug log
 
             if (error) {
                 console.error('Supabase error:', error);
@@ -2862,17 +2874,8 @@
 
             if (data && data.length > 0) {
                 announcementsCache = data.map(item => {
-                    // Handle date parsing - Supabase returns date as YYYY-MM-DD string
-                    let parsedDate = new Date();
-                    if (item.date) {
-                        // Parse date in YYYY-MM-DD format
-                        const dateParts = item.date.split('-');
-                        if (dateParts.length === 3) {
-                            parsedDate = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
-                        } else {
-                            parsedDate = new Date(item.date);
-                        }
-                    }
+                    let parsedDate = item.date ? new Date(item.date) : new Date();
+                    if (Number.isNaN(parsedDate.getTime())) parsedDate = new Date();
 
                     return {
                         id: item.id,
@@ -2882,15 +2885,11 @@
                         createdAt: item.created_at ? new Date(item.created_at) : new Date()
                     };
                 });
-                // Update bell badge and popup
-                console.log('Announcements loaded:', announcementsCache.length); // Debug log
                 updateAnnouncementBadge();
                 populateAnnouncementPopup();
-                // Refresh icons
                 if (window.lucide) lucide.createIcons();
             } else {
                 announcementsCache = [];
-                console.log('No announcements data'); // Debug log
                 updateAnnouncementBadge();
                 populateAnnouncementPopup();
             }
@@ -2899,6 +2898,8 @@
             announcementsCache = [];
             updateAnnouncementBadge();
             populateAnnouncementPopup();
+        } finally {
+            renderAnnouncementBar();
         }
     }
 
@@ -2924,12 +2925,31 @@
         }).join('');
 
         bar.style.display = 'block';
+
+        // Add collapsed class by default
+        bar.classList.add('collapsed');
+
+        // Add click handler to toggle expand/collapse
+        const header = bar.querySelector('.announcement-bar-header');
+        if (header) {
+            header.style.cursor = 'pointer';
+            header.onclick = () => {
+                bar.classList.toggle('collapsed');
+            };
+        }
+
         if (window.lucide) lucide.createIcons();
     }
 
     function initAnnouncementBar() {
         const dismissBtn = $('#announcement-dismiss');
         if (dismissBtn) dismissBtn.style.display = 'none';
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) return;
+            if (!currentUser || currentPage !== 'dashboard') return;
+            loadAnnouncements();
+        });
     }
 
 })();

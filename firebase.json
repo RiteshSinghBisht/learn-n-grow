@@ -13,7 +13,10 @@
     "public": ".",
     "ignore": [
       "firebase.json",
+      ".git/**",
+      ".playwright-cli/**",
       "**/.*",
+      "**/.*/**",
       "**/node_modules/**"
     ],
     "rewrites": [

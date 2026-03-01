@@ -819,6 +819,15 @@ select {
   color: var(--text-heading);
 }
 
+/* Expand/Collapse icon */
+.announcement-popup-expand-icon {
+  transition: transform 0.3s ease;
+}
+
+.announcement-popup.collapsed .announcement-popup-expand-icon {
+  transform: rotate(180deg);
+}
+
 .announcement-popup-list {
   flex: 1;
   overflow-y: auto;
@@ -870,6 +879,29 @@ select {
   text-align: center;
   color: var(--text-muted);
   font-size: 14px;
+}
+
+@media (max-width: 640px) {
+  .announcement-popup {
+    width: min(360px, calc(100vw - 20px));
+    max-height: 70vh;
+    right: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .announcement-popup {
+    width: calc(100vw - 16px);
+    right: -4px;
+  }
+
+  .announcement-popup-header {
+    padding: 12px 14px;
+  }
+
+  .announcement-popup-item {
+    padding: 10px;
+  }
 }
 
 /* Bell Popup Overlay */
@@ -1290,6 +1322,25 @@ select {
   padding: var(--s-5) var(--s-6);
   margin-bottom: var(--s-8);
   animation: fadeUp 0.5s var(--ease);
+  transition: all 0.3s ease;
+}
+
+/* Collapsed state for announcement bar */
+.announcement-bar.collapsed {
+  padding: var(--s-4) var(--s-6);
+  margin-bottom: var(--s-4);
+}
+
+.announcement-bar.collapsed .announcement-list {
+  display: none;
+}
+
+.announcement-bar.collapsed .announcement-expand-icon {
+  transform: rotate(0deg);
+}
+
+.announcement-expand-icon {
+  transition: transform 0.3s ease;
 }
 
 .announcement-bar-header {

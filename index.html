@@ -39,7 +39,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=8" />
+  <link rel="stylesheet" href="styles.css?v=9" />
   <style type="text/tailwindcss">
     @layer base {
       body {
@@ -398,9 +398,12 @@
             <span class="announcement-dot"></span>
             <span>Announcements</span>
           </div>
-          <button class="announcement-dismiss" id="announcement-dismiss" title="Dismiss">
-            <i data-lucide="x" style="width:16px;height:16px;"></i>
-          </button>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <i data-lucide="chevron-down" class="announcement-expand-icon" style="width:16px;height:16px;color:var(--text-muted);"></i>
+            <button class="announcement-dismiss" id="announcement-dismiss" title="Dismiss">
+              <i data-lucide="x" style="width:16px;height:16px;"></i>
+            </button>
+          </div>
         </div>
         <div class="announcement-list" id="announcement-list"></div>
       </section>
@@ -880,7 +883,7 @@
 
   <script src="daily-data.js"></script>
   <script src="activity-data.js"></script>
-  <script src="app.js?v=7"></script>
+  <script src="app.js?v=8"></script>
 </body>
 
 </html>
