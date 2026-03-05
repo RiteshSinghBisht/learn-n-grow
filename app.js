@@ -55,7 +55,11 @@
     let announcementsRefreshTimer = null;
     const ANNOUNCEMENTS_REFRESH_MS = 60000;
 
-    const ACTIVITY_SET_ID = 'modals_have_v1';
+    const ACTIVITY_ROUTE_TO_SET = {
+        'activity-modals-have': 'modals_have_v1',
+        'activity-level-assessment': 'level_assessment_v1'
+    };
+    let ACTIVITY_SET_ID = ACTIVITY_ROUTE_TO_SET['activity-modals-have'];
     const ACTIVITY_VERSION = 1;
 
     // ---- Firestore Helpers ----
@@ -297,6 +301,7 @@
         initChat();
         initVoice();
         initFeedback();
+        initTestSelector();
         initProfile();
         initAnnouncementBar();
         initScrollAnimations();
@@ -368,6 +373,13 @@
 
     // ---- Navigation ----
     function navigateTo(page) {
+        const isActivityPage = page === 'activity-modals-have' || page === 'activity-level-assessment';
+        if (isActivityPage) {
+            ACTIVITY_SET_ID = ACTIVITY_ROUTE_TO_SET[page] || ACTIVITY_ROUTE_TO_SET['activity-modals-have'];
+        }
+
+        // Both activity routes share the same visual page shell.
+        const pageTarget = isActivityPage ? 'activity-modals-have' : page;
         const isChatPage = page === 'chat-fluent' || page === 'chat-khushi';
         document.body.classList.toggle('chat-open', isChatPage);
 
@@ -375,7 +387,7 @@
         $$('.auth-page, .page, .chat-page, .profile-page').forEach(el => el.classList.remove('active'));
 
         // Show target
-        const target = $(`#page-${page}`);
+        const target = $(`#page-${pageTarget}`);
         if (target) {
             target.classList.add('active');
             currentPage = page;
@@ -396,7 +408,7 @@
         if (page === 'chat-khushi') {
             incrementSession('khushi');
         }
-        if (page === 'activity-modals-have') {
+        if (isActivityPage) {
             openActivityPage();
         }
         if (page === 'profile') {
@@ -669,7 +681,7 @@
         alert(`${announcement.title}\n\n${announcement.message}\n\nDate: ${dateStr}`);
     };
 
-    // ---- Activity (Past Modals) ----
+    // ---- Activity (Self Assessment + Test Series) ----
     const N8N_ACTIVITY_REPORT_WEBHOOK = 'https://n8n.ritesh-ai-automation.in/webhook/activity-modals-report';
     const ACTIVITY_MODAL_OPTIONS = [
         'could have',
@@ -685,13 +697,18 @@
         'past advice / regret': { bg: 'bg-green', text: 'text-green', border: 'border-green' },
         'past negative advice / regret': { bg: 'bg-red', text: 'text-red', border: 'border-red' },
         'past willingness': { bg: 'bg-orange', text: 'text-orange', border: 'border-orange' },
+        'Section A: Grammar': { bg: 'bg-blue', text: 'text-blue', border: 'border-blue' },
+        'Section B: Vocabulary': { bg: 'bg-purple', text: 'text-purple', border: 'border-purple' },
+        'Section C: Sentence Skills': { bg: 'bg-green', text: 'text-green', border: 'border-green' },
+        'Section D: Reading Comprehension': { bg: 'bg-orange', text: 'text-orange', border: 'border-orange' },
+        default: { bg: 'bg-blue', text: 'text-blue', border: 'border-blue' }
     };
     const ACTIVITY_HINTS = {
         'past possibility': "Use 'could have + past participle' for something that was possible but did not happen.",
         'past negative possibility': "Use 'couldn't have + past participle' for something that was not possible.",
         'past advice / regret': "Use 'should have + past participle' for something that would have been better to do.",
         'past negative advice / regret': "Use 'shouldn't have + past participle' for something that was a mistake.",
-        'past willingness': "Use 'would have + past participle' for willingness blocked by circumstances.",
+        'past willingness': "Use 'would have + past participle' for willingness blocked by circumstances."
     };
 
     function getActivitySet() {
@@ -699,8 +716,59 @@
         return ACTIVITY_SETS[ACTIVITY_SET_ID] || null;
     }
 
+    function isModalsActivity(set = getActivitySet()) {
+        return !!set && set.id === 'modals_have_v1';
+    }
+
+    function isReportEnabled(set = getActivitySet()) {
+        if (!set) return false;
+        return set.reportEnabled !== false;
+    }
+
+    function getQuestionType(question) {
+        if (!question) return 'fill_blank';
+        if (question.expectedPhrase) return 'modal_phrase';
+        return question.type || 'fill_blank';
+    }
+
+    function getQuestionContextLabel(question, set = getActivitySet()) {
+        if (!question || !set) return 'Question';
+        if (isModalsActivity(set)) return question.category || 'Past Modals';
+
+        const section = Array.isArray(set.sections)
+            ? set.sections.find(s => Array.isArray(s.questions) && s.questions.includes(question.id))
+            : null;
+        return section?.name || 'Self Assessment';
+    }
+
+    function getContextStyle(label) {
+        return ACTIVITY_CONTEXT_STYLES[label] || ACTIVITY_CONTEXT_STYLES.default;
+    }
+
+    function getExpectedAnswerText(question) {
+        if (!question) return '';
+
+        const type = getQuestionType(question);
+        if (type === 'modal_phrase') return question.expectedPhrase || '';
+
+        if (type === 'multiple_choice' && Array.isArray(question.options) && Number.isInteger(question.correctAnswer)) {
+            return question.options[question.correctAnswer] || '';
+        }
+
+        if (typeof question.correctAnswer === 'string') return question.correctAnswer;
+        if (Array.isArray(question.normalizedAnswers) && question.normalizedAnswers.length > 0) {
+            return question.normalizedAnswers[0];
+        }
+        return '';
+    }
+
+    function isActivityAnswerSubmitted(answer) {
+        if (!answer || typeof answer !== 'object') return false;
+        if (Number.isInteger(answer.selectedOptionIndex)) return true;
+        return typeof answer.rawInput === 'string' && answer.rawInput.trim().length > 0;
+    }
+
     function initActivity() {
-        // Leave-test modal — wire these first, independent of other elements
         const leaveModal = $('#leave-test-modal');
         $('#leave-test-cancel')?.addEventListener('click', () => leaveModal?.classList.remove('open'));
         $('#leave-test-confirm')?.addEventListener('click', () => {
@@ -729,7 +797,6 @@
         tryAgainBtn?.addEventListener('click', resetActivityProgress);
         retryBtn?.addEventListener('click', () => requestActivityReport(true));
         hintBtn.addEventListener('click', toggleCurrentHint);
-        // Note: answer-input listeners are attached dynamically in renderCurrentActivityQuestion
     }
 
     function openActivityPage() {
@@ -754,7 +821,12 @@
         activityEditingQuestionId = null;
         renderActivity();
 
-        if (activityState.status === 'completed' && !activityState.report && activityState.reportStatus !== 'loading') {
+        if (
+            isReportEnabled(set) &&
+            activityState.status === 'completed' &&
+            !activityState.report &&
+            activityState.reportStatus !== 'loading'
+        ) {
             requestActivityReport(false);
         }
     }
@@ -811,7 +883,7 @@
 
         set.questions.forEach(q => {
             const answer = state.answersById?.[String(q.id)];
-            if (!answer || typeof answer.normalizedInput !== 'string' || !answer.normalizedInput) return;
+            if (!isActivityAnswerSubmitted(answer)) return;
             submittedCount += 1;
             if (answer.isCorrect) correctCount += 1;
         });
@@ -849,7 +921,7 @@
 
     function formatQuestionWithBlank(prompt, answerText = '', showInput = false) {
         if (showInput) {
-            const blank = `<input type="text" id="answer-input" class="inline-blank-input" placeholder="type here..." autocomplete="off" spellcheck="false">`;
+            const blank = '<input type="text" id="answer-input" class="inline-blank-input" placeholder="type here..." autocomplete="off" spellcheck="false">';
             if (/_{2,}/.test(prompt)) return escapeHTML(prompt).replace(/_{2,}/g, blank);
             return `${escapeHTML(prompt)} ${blank}`;
         }
@@ -857,6 +929,68 @@
         const blank = `<span class="blank">${blankText}</span>`;
         if (/_{2,}/.test(prompt)) return escapeHTML(prompt).replace(/_{2,}/g, blank);
         return `${escapeHTML(prompt)} ${blank}`;
+    }
+
+    function attachTextAnswerListeners(inputEl) {
+        if (!inputEl) return;
+        inputEl.addEventListener('input', updateActivityActionState);
+        inputEl.addEventListener('keydown', e => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const checkBtn = $('#check-btn');
+                if (checkBtn && !checkBtn.disabled) submitCurrentActivityAnswer();
+            }
+        });
+    }
+
+    function renderAssessmentInputWidget(question, answer, isEditing, mountEl) {
+        const type = getQuestionType(question);
+        if (!mountEl) return;
+
+        if (type === 'multiple_choice') {
+            const selectedIndex = (isEditing && Number.isInteger(answer?.selectedOptionIndex))
+                ? answer.selectedOptionIndex
+                : null;
+
+            mountEl.innerHTML = `
+                <div class="answer-options">
+                    ${(question.options || []).map((opt, idx) => `
+                        <label class="answer-option" for="answer-option-${idx}">
+                            <input
+                                id="answer-option-${idx}"
+                                type="radio"
+                                name="answer-option"
+                                value="${idx}"
+                                ${selectedIndex === idx ? 'checked' : ''}
+                            />
+                            <span>${escapeHTML(opt)}</span>
+                        </label>
+                    `).join('')}
+                </div>
+            `;
+
+            mountEl.querySelectorAll('input[name="answer-option"]').forEach(input => {
+                input.addEventListener('change', updateActivityActionState);
+            });
+            return;
+        }
+
+        const value = isEditing ? (answer?.rawInput || '') : '';
+        mountEl.innerHTML = `
+            <div class="input-row">
+                <input
+                    type="text"
+                    id="answer-input"
+                    class="activity-answer-input"
+                    placeholder="Type your answer..."
+                    autocomplete="off"
+                    spellcheck="false"
+                    value="${escapeHTML(value)}"
+                />
+            </div>
+        `;
+
+        attachTextAnswerListeners(mountEl.querySelector('#answer-input'));
     }
 
     function buildActivityQuickNav() {
@@ -887,7 +1021,7 @@
 
             btn.classList.remove('current', 'answered', 'correct', 'wrong');
             if (index === activityState.currentIndex && activityState.status !== 'completed') btn.classList.add('current');
-            if (answer) {
+            if (isActivityAnswerSubmitted(answer)) {
                 btn.classList.add('answered');
                 btn.classList.add(answer.isCorrect ? 'correct' : 'wrong');
             }
@@ -898,6 +1032,7 @@
         const set = getActivitySet();
         if (!set || !activityState) return;
 
+        const navTitleEl = $('.activity-nav-title');
         const titleEl = $('#activity-title');
         const subtitleEl = $('#activity-subtitle');
         const badgeEl = $('#activity-badge');
@@ -906,9 +1041,14 @@
         const progressFillEl = $('#progress-fill');
         const quizContainer = $('#quiz-container');
         const resultsContainer = $('#results-container');
+        const grammarRefCard = $('#grammar-ref-card');
+        const reportCard = $('#activity-report-card');
 
-        if (titleEl) titleEl.textContent = 'Past Modals Exercise';
-        if (subtitleEl) subtitleEl.textContent = 'Could Have / Should Have / Would Have';
+        if (navTitleEl) navTitleEl.textContent = set.navTitle || set.title || 'Activity';
+        if (titleEl) titleEl.textContent = set.title || 'Activity';
+        if (subtitleEl) subtitleEl.textContent = set.subtitle || '';
+        if (grammarRefCard) grammarRefCard.classList.toggle('hidden', !isModalsActivity(set));
+        if (reportCard) reportCard.classList.toggle('hidden', !isReportEnabled(set));
 
         const progressRatio = Math.max(0, Math.min(1, activityState.submittedCount / set.totalQuestions));
         if (progressFillEl) progressFillEl.style.width = `${Math.round(progressRatio * 100)}%`;
@@ -942,9 +1082,16 @@
         if (!question) return;
 
         const set = getActivitySet();
+        const questionType = getQuestionType(question);
+        const contextLabel = getQuestionContextLabel(question, set);
+        const contextStyle = getContextStyle(contextLabel);
+
         const contextBadge = $('#context-badge');
+        const questionPassage = $('#question-passage');
         const questionText = $('#question-text');
+        const verbHintWrap = $('.verb-hint');
         const verbHint = $('#verb-hint');
+        const answerWidget = $('#answer-widget');
         const inputArea = $('#input-area');
         const resultArea = $('#result-area');
         const hintBox = $('#hint-box');
@@ -954,43 +1101,73 @@
 
         const answer = getActivityAnswer(question.id);
         const isEditing = activityEditingQuestionId === question.id;
-        const contextStyle = ACTIVITY_CONTEXT_STYLES[question.category] || ACTIVITY_CONTEXT_STYLES['past possibility'];
 
         if (progressText && set) progressText.textContent = `${activityState.currentIndex + 1} / ${set.totalQuestions}`;
         if (progressFill && set) progressFill.style.width = `${((activityState.currentIndex + 1) / set.totalQuestions) * 100}%`;
 
         if (contextBadge) {
             contextBadge.className = `context-badge ${contextStyle.bg} ${contextStyle.text} ${contextStyle.border}`;
-            contextBadge.textContent = question.category;
+            contextBadge.textContent = contextLabel;
         }
 
-        const showInput = !answer || isEditing;
-        if (questionText) {
-            const filled = answer && !isEditing ? answer.rawInput : '';
-            questionText.innerHTML = formatQuestionWithBlank(question.prompt, filled, showInput);
-
-            // Wire the inline input that was just injected into the DOM
-            if (showInput) {
-                const inlineInput = questionText.querySelector('#answer-input');
-                if (inlineInput) {
-                    inlineInput.value = isEditing ? (answer?.rawInput || '') : '';
-                    inlineInput.addEventListener('input', updateActivityActionState);
-                    inlineInput.addEventListener('keydown', e => {
-                        if (e.key === 'Enter') {
-                            e.preventDefault();
-                            const checkBtn = $('#check-btn');
-                            if (checkBtn && !checkBtn.disabled) submitCurrentActivityAnswer();
-                        }
-                    });
-                    inlineInput.focus();
-                }
+        if (questionPassage) {
+            if (question.passage) {
+                questionPassage.textContent = question.passage;
+                questionPassage.classList.remove('hidden');
+            } else {
+                questionPassage.textContent = '';
+                questionPassage.classList.add('hidden');
             }
         }
 
-        if (verbHint) verbHint.textContent = `(${extractVerbFromPrompt(question.prompt)})`;
+        const showInput = !isActivityAnswerSubmitted(answer) || isEditing;
+        if (questionText) {
+            if (questionType === 'modal_phrase') {
+                const filled = answer && !isEditing ? answer.rawInput : '';
+                questionText.innerHTML = formatQuestionWithBlank(question.prompt, filled, showInput);
+            } else {
+                questionText.textContent = question.prompt || '';
+            }
+        }
+
+        if (verbHintWrap && verbHint) {
+            if (questionType === 'modal_phrase') {
+                const verb = extractVerbFromPrompt(question.prompt);
+                if (verb) {
+                    verbHint.textContent = `(${verb})`;
+                    verbHintWrap.style.display = 'flex';
+                } else {
+                    verbHintWrap.style.display = 'none';
+                }
+            } else {
+                verbHintWrap.style.display = 'none';
+            }
+        }
+
+        if (answerWidget) {
+            answerWidget.innerHTML = '';
+        }
+
+        if (showInput && questionType === 'modal_phrase') {
+            const inlineInput = questionText ? $('#answer-input', questionText) : null;
+            if (inlineInput) {
+                inlineInput.value = isEditing ? (answer?.rawInput || '') : '';
+                attachTextAnswerListeners(inlineInput);
+                inlineInput.focus();
+            }
+        }
+
+        if (showInput && questionType !== 'modal_phrase' && answerWidget) {
+            renderAssessmentInputWidget(question, answer, isEditing, answerWidget);
+            if (questionType === 'multiple_choice') {
+                ($('input[name="answer-option"]:checked', answerWidget) || $('#answer-option-0', answerWidget))?.focus();
+            } else {
+                $('#answer-input', answerWidget)?.focus();
+            }
+        }
 
         if (inputArea && resultArea) {
-            if (answer && !isEditing) {
+            if (!showInput) {
                 inputArea.classList.add('hidden');
                 resultArea.classList.remove('hidden');
                 renderAnswerResult(answer, question);
@@ -1017,6 +1194,7 @@
         const nextBtn = $('#next-btn');
 
         const isCorrect = !!answer?.isCorrect;
+        const questionType = getQuestionType(question);
 
         if (resultBox) {
             resultBox.className = `result-box ${isCorrect ? 'result-correct' : 'result-incorrect'}`;
@@ -1028,16 +1206,31 @@
 
         if (resultExplanation) {
             let html = '';
+
             if (!isCorrect) {
-                html += `<p style="margin-bottom:8px;">Correct answer: <strong class="text-correct">${escapeHTML(question.expectedPhrase)}</strong></p>`;
+                const expected = getExpectedAnswerText(question);
+                if (expected) {
+                    html += `<p style="margin-bottom:8px;">Correct answer: <strong class="text-correct">${escapeHTML(expected)}</strong></p>`;
+                }
             }
-            html += `<p><strong>Model sentence:</strong> ${escapeHTML(question.modelSentence)}</p>`;
+
+            if (questionType === 'modal_phrase' && question.modelSentence) {
+                html += `<p><strong>Model sentence:</strong> ${escapeHTML(question.modelSentence)}</p>`;
+            }
+
+            if (question.explanation) {
+                html += `<p style="margin-top:8px;"><strong>Explanation:</strong> ${escapeHTML(question.explanation)}</p>`;
+            }
+
+            if (!html) {
+                html = '<p>Answer submitted.</p>';
+            }
             resultExplanation.innerHTML = html;
         }
 
         if (nextBtn) {
             const isLast = activityState.currentIndex >= (getActivitySet()?.totalQuestions || 1) - 1;
-            nextBtn.textContent = isLast ? 'View Results' : 'Next Question →';
+            nextBtn.textContent = isLast ? 'View Results' : 'Next Question ->';
         }
     }
 
@@ -1045,15 +1238,22 @@
         const question = getCurrentActivityQuestion();
         if (!question || !activityState) return;
 
-        const answerInput = $('#answer-input');
         const checkBtn = $('#check-btn');
         const prevBtn = $('#prev-btn');
         if (!checkBtn) return;
 
         const answer = getActivityAnswer(question.id);
-        const isSubmitted = !!answer;
+        const isSubmitted = isActivityAnswerSubmitted(answer);
         const isEditing = activityEditingQuestionId === question.id;
-        const hasInput = answerInput ? answerInput.value.trim().length > 0 : false;
+        const type = getQuestionType(question);
+
+        let hasInput = false;
+        if (type === 'multiple_choice') {
+            hasInput = !!$('input[name="answer-option"]:checked');
+        } else {
+            const answerInput = $('#answer-input');
+            hasInput = !!(answerInput && answerInput.value.trim().length > 0);
+        }
 
         if (isSubmitted && !isEditing) {
             checkBtn.disabled = true;
@@ -1088,31 +1288,87 @@
         return canonicalizeNegativeModalPrefix(normalizeAnswer(text));
     }
 
+    function evaluateActivityAnswer(question, rawInput, selectedOptionIndex = null) {
+        const type = getQuestionType(question);
+
+        if (type === 'modal_phrase') {
+            const normalizedInput = normalizeAnswer(rawInput);
+            const normalizedInputForCompare = normalizeActivityPhraseForCompare(rawInput);
+            const normalizedExpectedForCompare = normalizeActivityPhraseForCompare(question.normalizedExpectedPhrase || question.expectedPhrase);
+            return {
+                normalizedInput,
+                normalizedInputForCompare,
+                isCorrect: normalizedInputForCompare === normalizedExpectedForCompare
+            };
+        }
+
+        if (type === 'multiple_choice') {
+            const normalizedInput = normalizeAnswer(rawInput);
+            const correctIndex = Number(question.correctAnswer);
+            return {
+                normalizedInput,
+                normalizedInputForCompare: normalizedInput,
+                isCorrect: Number.isInteger(selectedOptionIndex) && selectedOptionIndex === correctIndex
+            };
+        }
+
+        const normalizedInput = normalizeAnswer(rawInput);
+        const accepted = [];
+
+        if (Array.isArray(question.normalizedAnswers)) {
+            accepted.push(...question.normalizedAnswers.map(a => normalizeAnswer(a)));
+        }
+        if (typeof question.correctAnswer === 'string') {
+            accepted.push(normalizeAnswer(question.correctAnswer));
+        }
+
+        const uniqueAccepted = [...new Set(accepted.filter(Boolean))];
+        return {
+            normalizedInput,
+            normalizedInputForCompare: normalizedInput,
+            isCorrect: uniqueAccepted.includes(normalizedInput)
+        };
+    }
+
     function submitCurrentActivityAnswer() {
         const set = getActivitySet();
         const question = getCurrentActivityQuestion();
-        const answerInput = $('#answer-input');
-        if (!set || !question || !answerInput || !activityState) return;
+        if (!set || !question || !activityState) return;
 
-        const rawInput = answerInput.value.trim();
-        if (!rawInput) {
-            showToast('Please type your answer.');
-            return;
+        const questionType = getQuestionType(question);
+        let rawInput = '';
+        let selectedOptionIndex = null;
+
+        if (questionType === 'multiple_choice') {
+            const selected = $('input[name="answer-option"]:checked');
+            if (!selected) {
+                showToast('Please select an option.');
+                return;
+            }
+            selectedOptionIndex = Number(selected.value);
+            rawInput = question.options?.[selectedOptionIndex] || '';
+        } else {
+            const answerInput = $('#answer-input');
+            if (!answerInput || !answerInput.value.trim()) {
+                showToast('Please type your answer.');
+                return;
+            }
+            rawInput = answerInput.value.trim();
         }
 
-        const { modal: selectedModal, verb: verbPart } = parseAnswerParts(rawInput);
-        const normalizedInput = normalizeAnswer(rawInput);
-        const normalizedInputForCompare = normalizeActivityPhraseForCompare(rawInput);
-        const normalizedExpectedForCompare = normalizeActivityPhraseForCompare(question.normalizedExpectedPhrase || question.expectedPhrase);
-        const isCorrect = normalizedInputForCompare === normalizedExpectedForCompare;
+        const evaluation = evaluateActivityAnswer(question, rawInput, selectedOptionIndex);
+        const modalParts = questionType === 'modal_phrase'
+            ? parseAnswerParts(rawInput)
+            : { modal: '', verb: '' };
 
         activityState.answersById[String(question.id)] = {
             rawInput,
-            normalizedInput,
-            normalizedInputForCompare,
-            isCorrect,
-            selectedModal,
-            verbPart,
+            normalizedInput: evaluation.normalizedInput,
+            normalizedInputForCompare: evaluation.normalizedInputForCompare,
+            isCorrect: evaluation.isCorrect,
+            selectedOptionIndex,
+            selectedModal: modalParts.modal,
+            verbPart: modalParts.verb,
             submittedAt: new Date().toISOString()
         };
 
@@ -1128,7 +1384,12 @@
         renderCurrentActivityQuestion();
         renderActivity();
 
-        if (activityState.status === 'completed' && !activityState.report && activityState.reportStatus !== 'loading') {
+        if (
+            isReportEnabled(set) &&
+            activityState.status === 'completed' &&
+            !activityState.report &&
+            activityState.reportStatus !== 'loading'
+        ) {
             requestActivityReport(false);
         }
     }
@@ -1136,7 +1397,7 @@
     function enableActivityEditMode() {
         const question = getCurrentActivityQuestion();
         const answer = question ? getActivityAnswer(question.id) : null;
-        if (!question || !answer) return;
+        if (!question || !isActivityAnswerSubmitted(answer)) return;
 
         activityEditingQuestionId = question.id;
         renderCurrentActivityQuestion();
@@ -1145,7 +1406,11 @@
         if (answerInput) {
             answerInput.focus();
             answerInput.setSelectionRange(answerInput.value.length, answerInput.value.length);
+            return;
         }
+
+        const selectedOption = $('input[name="answer-option"]:checked') || $('input[name="answer-option"]');
+        selectedOption?.focus();
     }
 
     function toggleCurrentHint() {
@@ -1159,7 +1424,13 @@
             return;
         }
 
-        const hint = ACTIVITY_HINTS[question.category] || 'Use the category clue to choose the correct modal phrase.';
+        let hint = '';
+        if (isModalsActivity()) {
+            hint = ACTIVITY_HINTS[question.category] || 'Use the category clue to choose the correct modal phrase.';
+        } else {
+            hint = question.explanation || 'Review the sentence carefully and select the best answer.';
+        }
+
         hintBox.textContent = `Tip: ${hint}`;
         hintBox.classList.remove('hidden');
     }
@@ -1170,7 +1441,7 @@
         if (!set || !question || !activityState) return;
 
         const answer = getActivityAnswer(question.id);
-        if (!answer) {
+        if (!isActivityAnswerSubmitted(answer)) {
             showToast('Submit this answer before moving next.');
             return;
         }
@@ -1188,7 +1459,7 @@
             activityState.completedAt = activityState.completedAt || new Date().toISOString();
             persistActivityProgress();
             renderActivity();
-            if (!activityState.report && activityState.reportStatus !== 'loading') {
+            if (isReportEnabled(set) && !activityState.report && activityState.reportStatus !== 'loading') {
                 requestActivityReport(false);
             }
         }
@@ -1226,39 +1497,59 @@
         const total = set.totalQuestions;
         const correct = activityState.correctCount;
         const percentage = Math.round((correct / total) * 100);
+        const passMark = Number.isFinite(set.passMark) ? set.passMark : null;
+        const passed = passMark === null ? percentage >= 60 : correct >= passMark;
+        const gradeBand = Array.isArray(set.grading)
+            ? set.grading.find(g => correct >= g.minScore && correct <= g.maxScore)
+            : null;
 
         if (scorePercentEl) scorePercentEl.textContent = `${percentage}%`;
 
         if (scoreCircleEl) {
             scoreCircleEl.className = 'score-circle';
             if (percentage >= 80) scoreCircleEl.classList.add('score-excellent');
-            else if (percentage >= 60) scoreCircleEl.classList.add('score-good');
+            else if (passed) scoreCircleEl.classList.add('score-good');
             else scoreCircleEl.classList.add('score-poor');
         }
 
         if (resultsTitleEl) {
-            if (percentage >= 80) resultsTitleEl.textContent = 'Excellent';
-            else if (percentage >= 60) resultsTitleEl.textContent = 'Good Job';
-            else resultsTitleEl.textContent = 'Keep Practicing';
+            if (gradeBand?.grade) {
+                resultsTitleEl.textContent = `Grade ${gradeBand.grade}`;
+            } else if (percentage >= 80) {
+                resultsTitleEl.textContent = 'Excellent';
+            } else if (passed) {
+                resultsTitleEl.textContent = 'Good Job';
+            } else {
+                resultsTitleEl.textContent = 'Keep Practicing';
+            }
         }
+
         if (resultsSubtitleEl) {
-            resultsSubtitleEl.textContent = `You got ${correct} out of ${total} questions correct`;
+            if (gradeBand) {
+                const levelPart = gradeBand.level ? `, ${gradeBand.level}` : '';
+                const passPart = passed ? 'Passed' : 'Not Passed';
+                const remarkPart = gradeBand.remarks ? ` - ${gradeBand.remarks}` : '';
+                resultsSubtitleEl.textContent = `You scored ${correct}/${total} (${percentage}%). ${passPart}${levelPart}${remarkPart}`;
+            } else {
+                resultsSubtitleEl.textContent = `You got ${correct} out of ${total} questions correct`;
+            }
         }
 
         if (reviewListEl) {
             reviewListEl.innerHTML = set.questions.map((q, index) => {
                 const answer = getActivityAnswer(q.id);
-                const userAnswer = answer?.rawInput || 'Not answered';
+                const userAnswer = isActivityAnswerSubmitted(answer) ? (answer.rawInput || 'Not answered') : 'Not answered';
                 const isCorrect = !!answer?.isCorrect;
+                const expectedAnswer = getExpectedAnswerText(q);
 
                 return `
                     <div class="review-item ${isCorrect ? 'review-correct' : 'review-incorrect'}">
                         <div class="review-header">
                             <div class="review-icon">${isCorrect ? '✓' : '✗'}</div>
                             <div class="review-content">
-                                <p><strong>Q${index + 1}:</strong> ${escapeHTML(q.prompt).replace(/_{2,}/g, '_____')}</p>
+                                <p><strong>Q${index + 1}:</strong> ${escapeHTML(q.prompt || '').replace(/_{2,}/g, '_____')}</p>
                                 <p class="review-answer">Your answer: <span class="${isCorrect ? 'text-correct' : 'text-incorrect'}">${escapeHTML(userAnswer)}</span></p>
-                                ${!isCorrect ? `<p class="review-answer">Correct: <span class="text-correct">${escapeHTML(q.expectedPhrase)}</span></p>` : ''}
+                                ${!isCorrect && expectedAnswer ? `<p class="review-answer">Correct: <span class="text-correct">${escapeHTML(expectedAnswer)}</span></p>` : ''}
                             </div>
                         </div>
                     </div>
@@ -1267,12 +1558,14 @@
         }
 
         updateActivityQuickNav();
-        renderActivityReport();
+        if (isReportEnabled(set)) {
+            renderActivityReport();
+        }
     }
 
     function buildActivityReportPayload() {
         const set = getActivitySet();
-        if (!set || !activityState) return null;
+        if (!set || !activityState || !isReportEnabled(set)) return null;
 
         const total = set.totalQuestions;
         const correct = activityState.correctCount;
@@ -1282,8 +1575,9 @@
             const answer = getActivityAnswer(q.id);
             return {
                 question_id: q.id,
-                category: q.category,
-                expected_phrase: q.expectedPhrase,
+                type: getQuestionType(q),
+                category: getQuestionContextLabel(q, set),
+                expected_phrase: getExpectedAnswerText(q),
                 user_input: answer?.rawInput || '',
                 is_correct: !!answer?.isCorrect
             };
@@ -1307,7 +1601,8 @@
     }
 
     async function requestActivityReport(forceRetry = false) {
-        if (!activityState || activityState.status !== 'completed') return;
+        const set = getActivitySet();
+        if (!set || !isReportEnabled(set) || !activityState || activityState.status !== 'completed') return;
         if (activityState.reportStatus === 'loading') return;
         if (activityState.report && !forceRetry) return;
 
@@ -1357,7 +1652,8 @@
     }
 
     function renderActivityReport() {
-        if (!activityState) return;
+        const set = getActivitySet();
+        if (!set || !isReportEnabled(set) || !activityState) return;
 
         const statusEl = $('#activity-report-status');
         const contentEl = $('#activity-report-content');
@@ -2609,6 +2905,38 @@
                     submitBtn.textContent = originalText;
                     submitBtn.disabled = false;
                 });
+        });
+    }
+
+    function initTestSelector() {
+        const modal = $('#test-selector-modal');
+        const trigger = $('#test-trigger');
+        const closeBtn = $('#test-selector-close');
+        const selfAssessmentBtn = $('#select-self-assessment');
+        const testSeriesBtn = $('#select-test-series');
+
+        const closeModal = () => modal?.classList.remove('open');
+        const openModal = () => modal?.classList.add('open');
+
+        trigger?.addEventListener('click', e => {
+            e.preventDefault();
+            openModal();
+        });
+
+        closeBtn?.addEventListener('click', closeModal);
+
+        modal?.addEventListener('click', e => {
+            if (e.target === modal) closeModal();
+        });
+
+        selfAssessmentBtn?.addEventListener('click', () => {
+            closeModal();
+            navigateTo('activity-level-assessment');
+        });
+
+        testSeriesBtn?.addEventListener('click', () => {
+            closeModal();
+            navigateTo('activity-modals-have');
         });
     }
 

@@ -3,12 +3,290 @@
  * Keeps content separate from app logic so future activities can be added safely.
  */
 const ACTIVITY_SETS = {
+    level_assessment_v1: {
+        id: 'level_assessment_v1',
+        title: 'Level Assessment Test',
+        navTitle: 'Self Assessment',
+        subtitle: 'English Proficiency Test',
+        instructions: 'Answer all 30 questions. Each question carries 1 mark.',
+        totalQuestions: 30,
+        passMark: 18,
+        timeLimit: 30, // minutes
+        reportEnabled: false,
+        sections: [
+            { name: 'Section A: Grammar', questions: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], totalMarks: 10 },
+            { name: 'Section B: Vocabulary', questions: [11, 12, 13, 14, 15, 16, 17, 18, 19, 20], totalMarks: 10 },
+            { name: 'Section C: Sentence Skills', questions: [21, 22, 23, 24, 25], totalMarks: 5 },
+            { name: 'Section D: Reading Comprehension', questions: [26, 27, 28, 29, 30], totalMarks: 5 }
+        ],
+        grading: [
+            { grade: 'A+', level: 'Excellent', minScore: 27, maxScore: 30, percentage: '90-100%', remarks: 'Outstanding mastery - Ready for advanced level' },
+            { grade: 'A', level: 'Very Good', minScore: 24, maxScore: 26, percentage: '80-89%', remarks: 'Strong proficiency - Minor gaps' },
+            { grade: 'B+', level: 'Good', minScore: 21, maxScore: 23, percentage: '70-79%', remarks: 'Good understanding - Needs practice on weak areas' },
+            { grade: 'B', level: 'Average', minScore: 18, maxScore: 20, percentage: '60-69%', remarks: 'Fair level - Requires focused revision' },
+            { grade: 'C', level: 'Below Average', minScore: 15, maxScore: 17, percentage: '50-59%', remarks: 'Needs improvement - Target grammar/vocabulary' },
+            { grade: 'D', level: 'Needs Help', minScore: 0, maxScore: 14, percentage: 'Below 50%', remarks: 'Basic level - Start with foundation worksheets' }
+        ],
+        questions: [
+            // Section A: Grammar (10 questions)
+            {
+                id: 1,
+                type: 'multiple_choice',
+                prompt: "She ___ a letter when the phone rang.",
+                options: ['writes', 'was writing', 'wrote'],
+                correctAnswer: 1, // index of 'was writing'
+                explanation: "Use past continuous for an action in progress when another action happened."
+            },
+            {
+                id: 2,
+                type: 'multiple_choice',
+                prompt: "By next year, they ___ the project.",
+                options: ['complete', 'will complete', 'will have completed'],
+                correctAnswer: 2, // index of 'will have completed'
+                explanation: "Use future perfect for an action that will be completed before a future point."
+            },
+            {
+                id: 3,
+                type: 'multiple_choice',
+                prompt: "Neither the teacher nor the students ___ happy.",
+                options: ['was', 'were', 'is'],
+                correctAnswer: 1, // index of 'were'
+                explanation: "With 'neither...nor', the verb agrees with the nearest subject (students -> plural)."
+            },
+            {
+                id: 4,
+                type: 'multiple_choice',
+                prompt: "If it ___ rain, we will stay home.",
+                options: ['rains', 'will rain', 'rained'],
+                correctAnswer: 0, // index of 'rains'
+                explanation: "In first conditional, use present simple after 'if' (not 'will rain')."
+            },
+            {
+                id: 5,
+                type: 'multiple_choice',
+                prompt: "He ___ to the market yesterday.",
+                options: ['go', 'goes', 'went'],
+                correctAnswer: 2, // index of 'went'
+                explanation: "'Yesterday' indicates past simple tense."
+            },
+            {
+                id: 6,
+                type: 'multiple_choice',
+                prompt: "The book ___ on the table since morning.",
+                options: ['is lying', 'has been lying', 'lies'],
+                correctAnswer: 1, // index of 'has been lying'
+                explanation: "Use present perfect continuous with 'since' for an action started in past and continuing."
+            },
+            {
+                id: 7,
+                type: 'multiple_choice',
+                prompt: "You ___ finish your homework before playing.",
+                options: ['can', 'must', 'may'],
+                correctAnswer: 1, // index of 'must'
+                explanation: "'Must' expresses obligation/necessity."
+            },
+            {
+                id: 8,
+                type: 'fill_blank',
+                prompt: "She is afraid ___ dogs.",
+                correctAnswer: 'of',
+                normalizedAnswers: ['of'],
+                explanation: "'Afraid of' is the correct collocation."
+            },
+            {
+                id: 9,
+                type: 'multiple_choice',
+                prompt: 'Reported speech: "I am tired," he said. → He said that he ___.',
+                options: ['is tired', 'was tired', 'tired'],
+                correctAnswer: 1, // index of 'was tired'
+                explanation: "In reported speech, present tense changes to past tense."
+            },
+            {
+                id: 10,
+                type: 'multiple_choice',
+                prompt: "A bunch of keys ___ on the floor.",
+                options: ['lie', 'lies', 'lying'],
+                correctAnswer: 1, // index of 'lies'
+                explanation: "'Bunch' is the singular head noun, so it takes a singular verb: 'lies'."
+            },
+            // Section B: Vocabulary (10 questions)
+            {
+                id: 11,
+                type: 'multiple_choice',
+                prompt: "Synonym of 'brave':",
+                options: ['coward', 'courageous', 'weak'],
+                correctAnswer: 1, // index of 'courageous'
+                explanation: "'Courageous' means brave."
+            },
+            {
+                id: 12,
+                type: 'multiple_choice',
+                prompt: "Antonym of 'ancient':",
+                options: ['old', 'modern', 'new'],
+                correctAnswer: 1, // index of 'modern'
+                explanation: "'Modern' is the opposite of 'ancient'."
+            },
+            {
+                id: 13,
+                type: 'multiple_choice',
+                prompt: '"The meeting was ___ due to rain."',
+                options: ['postponed', 'postposed', 'preponed'],
+                correctAnswer: 0, // index of 'postponed'
+                explanation: "'Postpone' means to delay. 'Postponed' is the correct past participle."
+            },
+            {
+                id: 14,
+                type: 'multiple_choice',
+                prompt: 'Idiom: "Break a leg" means:',
+                options: ['hurt yourself', 'good luck', 'run fast'],
+                correctAnswer: 1, // index of 'good luck'
+                explanation: "'Break a leg' is an idiom meaning 'good luck', especially before a performance."
+            },
+            {
+                id: 15,
+                type: 'multiple_choice',
+                prompt: 'Choose correct: "Advice" or "advise"? She gave me good ___.',
+                options: ['advice', 'advise'],
+                correctAnswer: 0, // index of 'advice'
+                explanation: "'Advice' is a noun (uncountable), 'advise' is a verb."
+            },
+            {
+                id: 16,
+                type: 'multiple_choice',
+                prompt: "Synonym of 'diligent':",
+                options: ['lazy', 'hardworking', 'careless'],
+                correctAnswer: 1, // index of 'hardworking'
+                explanation: "'Hardworking' means diligent."
+            },
+            {
+                id: 17,
+                type: 'multiple_choice',
+                prompt: '"He is ___ his brother."',
+                options: ['taller than', 'more tall than'],
+                correctAnswer: 0, // index of 'taller than'
+                explanation: "Use 'taller than' (not 'more tall than') for comparative of short adjectives."
+            },
+            {
+                id: 18,
+                type: 'multiple_choice',
+                prompt: "Antonym of 'generous':",
+                options: ['kind', 'selfish', 'helpful'],
+                correctAnswer: 1, // index of 'selfish'
+                explanation: "'Selfish' is the opposite of 'generous'."
+            },
+            {
+                id: 19,
+                type: 'multiple_choice',
+                prompt: 'Word meaning "very small":',
+                options: ['tiny', 'huge', 'big'],
+                correctAnswer: 0, // index of 'tiny'
+                explanation: "'Tiny' means very small."
+            },
+            {
+                id: 20,
+                type: 'multiple_choice',
+                prompt: '"Accept" or "except"? I like all fruits ___ mango.',
+                options: ['accept', 'except'],
+                correctAnswer: 1, // index of 'except'
+                explanation: "'Except' means 'not including'. 'Accept' means to receive."
+            },
+            // Section C: Sentence Skills (5 questions)
+            {
+                id: 21,
+                type: 'rearrange',
+                prompt: "Rearrange: school / to / went / I / bus / by",
+                correctAnswer: 'I went to school by bus',
+                normalizedAnswers: ['i went to school by bus', 'went to school by bus'],
+                explanation: "The correct order is: Subject + Verb + Object + Manner/Place."
+            },
+            {
+                id: 22,
+                type: 'fill_blank',
+                prompt: "The children ___ (play) in the park when it started raining.",
+                correctAnswer: 'were playing',
+                normalizedAnswers: ['were playing'],
+                explanation: "Use past continuous for an action in progress when another action happened."
+            },
+            {
+                id: 23,
+                type: 'multiple_choice',
+                prompt: "Choose preposition: He is good ___ maths.",
+                options: ['in', 'at', 'on'],
+                correctAnswer: 1, // index of 'at'
+                explanation: "'Good at' is the correct collocation."
+            },
+            {
+                id: 24,
+                type: 'multiple_choice',
+                prompt: "Modal: You ___ smoke here. (prohibited)",
+                options: ['mustn\'t', 'can', 'might'],
+                correctAnswer: 0, // index of 'mustn\'t'
+                explanation: "'Mustn't' expresses prohibition."
+            },
+            {
+                id: 25,
+                type: 'multiple_choice',
+                prompt: "Concord: Each of the boys ___ a gift.",
+                options: ['have', 'has', 'having'],
+                correctAnswer: 1, // index of 'has'
+                explanation: "'Each' always takes a singular verb."
+            },
+            // Section D: Reading Comprehension (5 questions)
+            {
+                id: 26,
+                type: 'reading_comprehension',
+                passage: "In a small town, there lived a boy named Amit. He loved reading books about science. Every evening, he went to the library to borrow new books. One day, he found a book on rockets. It explained how rockets work in space. Amit dreamed of becoming an astronaut. His teacher encouraged him to study hard.",
+                prompt: "Where did Amit go every evening?",
+                correctAnswer: 'library',
+                normalizedAnswers: ['library', 'to the library'],
+                explanation: "The passage states: 'Every evening, he went to the library to borrow new books.'"
+            },
+            {
+                id: 27,
+                type: 'multiple_choice',
+                passage: "In a small town, there lived a boy named Amit. He loved reading books about science. Every evening, he went to the library to borrow new books. One day, he found a book on rockets. It explained how rockets work in space. Amit dreamed of becoming an astronaut. His teacher encouraged him to study hard.",
+                prompt: "What did the book explain?",
+                options: ['animals', 'rockets', 'food'],
+                correctAnswer: 1, // index of 'rockets'
+                explanation: "The passage states: 'It explained how rockets work in space.'"
+            },
+            {
+                id: 28,
+                type: 'reading_comprehension',
+                passage: "In a small town, there lived a boy named Amit. He loved reading books about science. Every evening, he went to the library to borrow new books. One day, he found a book on rockets. It explained how rockets work in space. Amit dreamed of becoming an astronaut. His teacher encouraged him to study hard.",
+                prompt: "Inference: What does Amit want to be?",
+                correctAnswer: 'astronaut',
+                normalizedAnswers: ['astronaut', 'an astronaut'],
+                explanation: "The passage states: 'Amit dreamed of becoming an astronaut.'"
+            },
+            {
+                id: 29,
+                type: 'multiple_choice',
+                passage: "In a small town, there lived a boy named Amit. He loved reading books about science. Every evening, he went to the library to borrow new books. One day, he found a book on rockets. It explained how rockets work in space. Amit dreamed of becoming an astronaut. His teacher encouraged him to study hard.",
+                prompt: 'Synonym in passage: "Encouraged" means:',
+                options: ['stopped', 'motivated', 'ignored'],
+                correctAnswer: 1, // index of 'motivated'
+                explanation: "In context, 'encouraged' means to give support, confidence, or hope - synonymous with 'motivated'."
+            },
+            {
+                id: 30,
+                type: 'multiple_choice',
+                passage: "In a small town, there lived a boy named Amit. He loved reading books about science. Every evening, he went to the library to borrow new books. One day, he found a book on rockets. It explained how rockets work in space. Amit dreamed of becoming an astronaut. His teacher encouraged him to study hard.",
+                prompt: "True/False: Amit's teacher discouraged him.",
+                options: ['True', 'False'],
+                correctAnswer: 1, // index of 'False'
+                explanation: "The passage says 'His teacher encouraged him to study hard', so the statement is false."
+            }
+        ]
+    },
     modals_have_v1: {
         id: 'modals_have_v1',
         title: 'Could Have / Should Have / Would Have - Exercise 1',
+        navTitle: 'Past Modals',
         subtitle: 'Past Modals Practice',
         instructions: 'Fill only the blank phrase (for example: "could have bought").',
         totalQuestions: 25,
+        reportEnabled: true,
         questions: [
             {
                 id: 1,

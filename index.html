@@ -488,7 +488,7 @@
         </div>
       </section>
 
-      <!-- SECTION 4: Areas of Improvement (Removed) -->
+      <!-- Test access moved to floating button -->
 
 
       <!-- SECTION 5: Removed -->
@@ -497,14 +497,14 @@
 
 
       <!-- SECTION 9: Feedback (floating button) -->
+      <button class="activity-fab" id="test-trigger" title="Open tests">
+        <i data-lucide="clipboard-list" style="width:22px;height:22px;"></i>
+      </button>
+
       <button class="feedback-fab" id="feedback-trigger" title="Share feedback">
         <i data-lucide="message-square" style="width:22px;height:22px;"></i>
       </button>
 
-      <!-- Activity FAB -->
-      <button class="activity-fab" id="activity-trigger" title="Past Modals Activity" onclick="navigateTo('activity-modals-have')">
-        <i data-lucide="book-open" style="width:22px;height:22px;"></i>
-      </button>
 
     </main>
   </div>
@@ -650,6 +650,7 @@
 
         <div class="card" id="question-card">
           <div class="context-badge" id="context-badge">past possibility</div>
+          <div class="question-passage hidden" id="question-passage"></div>
           <p class="question-text" id="question-text"></p>
 
           <div class="verb-hint">
@@ -658,6 +659,7 @@
           </div>
 
           <div id="input-area">
+            <div id="answer-widget"></div>
             <div class="btn-row">
               <button class="btn-hint" id="hint-btn" type="button">Show Hint</button>
               <button class="btn btn-primary" id="check-btn" type="button" disabled>Check Answer</button>
@@ -688,7 +690,7 @@
           <div class="quick-nav" id="quick-nav"></div>
         </div>
 
-        <div class="card grammar-ref">
+        <div class="card grammar-ref" id="grammar-ref-card">
           <h3>Grammar Reference</h3>
           <div class="grammar-item">
             <div class="grammar-dot" style="background: #3b82f6;"></div>
@@ -728,7 +730,7 @@
           <div id="review-list"></div>
         </div>
 
-        <div class="card">
+        <div class="card" id="activity-report-card">
           <div class="activity-report-head">
             <h2 class="review-title">Personalized Report</h2>
             <button class="btn-hint" id="activity-report-retry-btn" type="button" style="display:none;">Retry Report</button>
@@ -830,6 +832,35 @@
           </form>
         </div>
         <button class="btn-danger-text" id="profile-logout" style="width:100%;text-align:center;">Sign Out</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===========================
+     TEST SELECTOR MODAL
+     =========================== -->
+  <div class="modal-overlay" id="test-selector-modal">
+    <div class="modal-box">
+      <h3>Select a Test</h3>
+      <p class="modal-sub">Choose which test you want to start.</p>
+      <div class="test-selector-options">
+        <button class="test-selector-btn" id="select-self-assessment" type="button">
+          <span>
+            <strong>Self Assessment</strong>
+            <small>30 questions level test</small>
+          </span>
+          <i data-lucide="arrow-right" style="width:16px;height:16px;"></i>
+        </button>
+        <button class="test-selector-btn" id="select-test-series" type="button">
+          <span>
+            <strong>Test Series</strong>
+            <small>Past Modals and upcoming tests</small>
+          </span>
+          <i data-lucide="arrow-right" style="width:16px;height:16px;"></i>
+        </button>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn-ghost" id="test-selector-close">Close</button>
       </div>
     </div>
   </div>
