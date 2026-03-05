@@ -53,6 +53,8 @@
     // ---- Announcements State ----
     let announcementsCache = [];
     let announcementsRefreshTimer = null;
+    let announcementCalendarVisible = false;
+    let announcementCalendarViewDate = null;
     const ANNOUNCEMENTS_REFRESH_MS = 60000;
 
     const ACTIVITY_ROUTE_TO_SET = {
@@ -393,6 +395,11 @@
             currentPage = page;
         }
 
+        if (page !== 'dashboard') {
+            $('#announcement-popup')?.classList.remove('open');
+            setAnnouncementCalendarVisible(false);
+        }
+
         syncAppViewportHeight();
 
         // Page-specific init
@@ -561,6 +568,155 @@
         }
     }
 
+    function getLocalDateKey(date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+
+    function getLocalStartOfDay(date) {
+        return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    }
+
+    function getUpcomingAnnouncementMap() {
+        const map = new Map();
+        const todayStart = getLocalStartOfDay(new Date()).getTime();
+
+        announcementsCache.forEach(announcement => {
+            if (!(announcement?.date instanceof Date) || Number.isNaN(announcement.date.getTime())) return;
+
+            const eventDay = getLocalStartOfDay(announcement.date);
+            if (eventDay.getTime() < todayStart) return;
+
+            const key = getLocalDateKey(eventDay);
+            if (!map.has(key)) map.set(key, []);
+            map.get(key).push(announcement);
+        });
+
+        return map;
+    }
+
+    function getAnnouncementCalendarDefaultMonth() {
+        const todayStart = getLocalStartOfDay(new Date()).getTime();
+        const upcoming = announcementsCache
+            .filter(a => a?.date instanceof Date && !Number.isNaN(a.date.getTime()))
+            .map(a => getLocalStartOfDay(a.date))
+            .filter(date => date.getTime() >= todayStart)
+            .sort((a, b) => a - b);
+
+        const baseDate = upcoming[0] || new Date();
+        return new Date(baseDate.getFullYear(), baseDate.getMonth(), 1);
+    }
+
+    function positionAnnouncementCalendar() {
+        const card = $('#announcement-calendar-card');
+        const popup = $('#announcement-popup');
+        if (!card || !popup) return;
+
+        const baseTop = popup.offsetTop || 0;
+        const popupHeight = popup.offsetHeight || 0;
+        const gap = 12;
+        const fallbackHeight = 170;
+        const topValue = baseTop + (popupHeight > 0 ? popupHeight : fallbackHeight) + gap;
+
+        card.style.top = `${topValue}px`;
+    }
+
+    function renderAnnouncementCalendar() {
+        const card = $('#announcement-calendar-card');
+        const monthLabel = $('#announcement-calendar-month');
+        const daysGrid = $('#announcement-calendar-days');
+        if (!card || !monthLabel || !daysGrid) return;
+        if (!announcementCalendarVisible) return;
+
+        if (!(announcementCalendarViewDate instanceof Date) || Number.isNaN(announcementCalendarViewDate.getTime())) {
+            announcementCalendarViewDate = getAnnouncementCalendarDefaultMonth();
+        }
+
+        const year = announcementCalendarViewDate.getFullYear();
+        const month = announcementCalendarViewDate.getMonth();
+        const firstOfMonth = new Date(year, month, 1);
+        const firstWeekday = firstOfMonth.getDay();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const daysInPrevMonth = new Date(year, month, 0).getDate();
+
+        monthLabel.textContent = firstOfMonth.toLocaleDateString('en-US', {
+            month: 'long',
+            year: 'numeric'
+        });
+
+        const todayKey = getLocalDateKey(new Date());
+        const upcomingMap = getUpcomingAnnouncementMap();
+        let html = '';
+
+        for (let i = 0; i < 42; i += 1) {
+            let dayNumber = 0;
+            let dateObj = null;
+            let isOtherMonth = false;
+
+            if (i < firstWeekday) {
+                dayNumber = daysInPrevMonth - firstWeekday + i + 1;
+                dateObj = new Date(year, month - 1, dayNumber);
+                isOtherMonth = true;
+            } else if (i >= firstWeekday + daysInMonth) {
+                dayNumber = i - (firstWeekday + daysInMonth) + 1;
+                dateObj = new Date(year, month + 1, dayNumber);
+                isOtherMonth = true;
+            } else {
+                dayNumber = i - firstWeekday + 1;
+                dateObj = new Date(year, month, dayNumber);
+            }
+
+            const dayKey = getLocalDateKey(dateObj);
+            const dayAnnouncements = upcomingMap.get(dayKey) || [];
+
+            const classes = ['calendar-day'];
+            if (isOtherMonth) classes.push('other-month');
+            if (dayKey === todayKey) classes.push('today');
+            if (dayAnnouncements.length > 0) classes.push('has-announcement');
+
+            const title = dayAnnouncements.length > 0
+                ? ` title="${escapeHTML(dayAnnouncements.map(item => item.title).join(' • '))}"`
+                : '';
+
+            html += `<div class="${classes.join(' ')}"${title}><span>${dayNumber}</span>${dayAnnouncements.length > 0 ? '<span class="calendar-day-dot"></span>' : ''}</div>`;
+        }
+
+        daysGrid.innerHTML = html;
+    }
+
+    function setAnnouncementCalendarVisible(visible, resetMonth = false) {
+        const card = $('#announcement-calendar-card');
+        if (!card) return;
+
+        announcementCalendarVisible = !!visible;
+        if (announcementCalendarVisible && resetMonth) {
+            announcementCalendarViewDate = getAnnouncementCalendarDefaultMonth();
+        }
+
+        card.style.display = announcementCalendarVisible ? 'block' : 'none';
+
+        if (announcementCalendarVisible) {
+            positionAnnouncementCalendar();
+            renderAnnouncementCalendar();
+        }
+    }
+
+    function shiftAnnouncementCalendarMonth(offset) {
+        if (!(announcementCalendarViewDate instanceof Date) || Number.isNaN(announcementCalendarViewDate.getTime())) {
+            announcementCalendarViewDate = getAnnouncementCalendarDefaultMonth();
+        }
+
+        announcementCalendarViewDate = new Date(
+            announcementCalendarViewDate.getFullYear(),
+            announcementCalendarViewDate.getMonth() + offset,
+            1
+        );
+        positionAnnouncementCalendar();
+        renderAnnouncementCalendar();
+    }
+
     // ---- Top Nav ----
     function initNav() {
         const trigger = $('#nav-profile-trigger');
@@ -590,26 +746,59 @@
         const bellBtn = $('#announcement-bell');
         const bellPopup = $('#announcement-popup');
         const bellPopupClose = $('#announcement-popup-close');
+        const calendarCard = $('#announcement-calendar-card');
+        const calendarPrevBtn = $('#announcement-calendar-prev');
+        const calendarNextBtn = $('#announcement-calendar-next');
 
         if (bellBtn && bellPopup) {
+            const closeAnnouncementUi = () => {
+                bellPopup.classList.remove('open');
+                setAnnouncementCalendarVisible(false);
+            };
+
             bellBtn.addEventListener('click', e => {
                 e.stopPropagation();
-                bellPopup.classList.toggle('open');
+                const shouldOpen = !bellPopup.classList.contains('open');
+                bellPopup.classList.toggle('open', shouldOpen);
+                setAnnouncementCalendarVisible(shouldOpen && announcementsCache.length > 0, true);
                 // Close profile dropdown if open
                 if (dropdown) dropdown.classList.remove('open');
             });
 
-            bellPopupClose.addEventListener('click', () => {
-                bellPopup.classList.remove('open');
-            });
+            if (bellPopupClose) {
+                bellPopupClose.addEventListener('click', closeAnnouncementUi);
+            }
 
-            document.addEventListener('click', () => {
-                bellPopup.classList.remove('open');
-            });
+            document.addEventListener('click', closeAnnouncementUi);
 
             bellPopup.addEventListener('click', e => {
                 e.stopPropagation();
             });
+
+            if (calendarCard) {
+                calendarCard.addEventListener('click', e => {
+                    e.stopPropagation();
+                });
+            }
+
+            if (calendarPrevBtn) {
+                calendarPrevBtn.addEventListener('click', e => {
+                    e.stopPropagation();
+                    shiftAnnouncementCalendarMonth(-1);
+                });
+            }
+
+            if (calendarNextBtn) {
+                calendarNextBtn.addEventListener('click', e => {
+                    e.stopPropagation();
+                    shiftAnnouncementCalendarMonth(1);
+                });
+            }
+
+            window.addEventListener('resize', () => {
+                if (!announcementCalendarVisible) return;
+                positionAnnouncementCalendar();
+            }, { passive: true });
         }
     }
 
@@ -641,6 +830,7 @@
         if (announcementsCache.length === 0) {
             popupList.style.display = 'none';
             popupEmpty.style.display = 'block';
+            positionAnnouncementCalendar();
             return;
         }
 
@@ -662,6 +852,8 @@
                 </div>
             `;
         }).join('');
+
+        positionAnnouncementCalendar();
     }
 
     // ---- Show Announcement Detail ----
@@ -3228,6 +3420,7 @@
             populateAnnouncementPopup();
         } finally {
             renderAnnouncementBar();
+            renderAnnouncementCalendar();
         }
     }
 
@@ -3238,6 +3431,7 @@
 
         if (announcementsCache.length === 0) {
             bar.style.display = 'none';
+            setAnnouncementCalendarVisible(false);
             return;
         }
 

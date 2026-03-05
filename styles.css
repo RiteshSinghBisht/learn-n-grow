@@ -887,10 +887,20 @@ select {
     max-height: 70vh;
     right: 0;
   }
+
+  .nav-right .announcement-calendar-card {
+    width: min(360px, calc(100vw - 20px));
+    right: 0;
+  }
 }
 
 @media (max-width: 480px) {
   .announcement-popup {
+    width: calc(100vw - 16px);
+    right: -4px;
+  }
+
+  .nav-right .announcement-calendar-card {
     width: calc(100vw - 16px);
     right: -4px;
   }
@@ -1423,6 +1433,17 @@ select {
 /* ===========================
    CALENDAR - APPLE STYLE
    =========================== */
+.announcement-calendar-card {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 220px);
+  width: 380px;
+  max-width: min(380px, calc(100vw - 20px));
+  margin: 0;
+  border: 1px solid var(--border-light);
+  z-index: 280;
+}
+
 .calendar-card {
   padding: 20px 16px 24px;
   background: #fff;
@@ -1533,10 +1554,14 @@ select {
 
 .calendar-day.has-announcement {
   cursor: pointer;
+  background: rgba(255, 149, 0, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(255, 149, 0, 0.35);
+  font-weight: 600;
 }
 
 .calendar-day.has-announcement:hover {
-  background: rgba(0, 122, 255, 0.08);
+  background: rgba(255, 149, 0, 0.22);
+  box-shadow: inset 0 0 0 1px rgba(255, 149, 0, 0.55);
 }
 
 .calendar-day.has-announcement.today:hover::before {
@@ -1562,13 +1587,17 @@ select {
 }
 
 .calendar-day-dot {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
   background: #FF9500;
   border-radius: 50%;
   margin-top: 2px;
   position: relative;
   z-index: 1;
+}
+
+.calendar-day.has-announcement .calendar-day-dot {
+  box-shadow: 0 0 0 2px rgba(255, 149, 0, 0.22);
 }
 
 .calendar-day.today .calendar-day-dot {
