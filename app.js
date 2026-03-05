@@ -609,20 +609,6 @@
         return new Date(baseDate.getFullYear(), baseDate.getMonth(), 1);
     }
 
-    function positionAnnouncementCalendar() {
-        const card = $('#announcement-calendar-card');
-        const popup = $('#announcement-popup');
-        if (!card || !popup) return;
-
-        const baseTop = popup.offsetTop || 0;
-        const popupHeight = popup.offsetHeight || 0;
-        const gap = 12;
-        const fallbackHeight = 170;
-        const topValue = baseTop + (popupHeight > 0 ? popupHeight : fallbackHeight) + gap;
-
-        card.style.top = `${topValue}px`;
-    }
-
     function renderAnnouncementCalendar() {
         const card = $('#announcement-calendar-card');
         const monthLabel = $('#announcement-calendar-month');
@@ -698,7 +684,6 @@
         card.style.display = announcementCalendarVisible ? 'block' : 'none';
 
         if (announcementCalendarVisible) {
-            positionAnnouncementCalendar();
             renderAnnouncementCalendar();
         }
     }
@@ -713,7 +698,6 @@
             announcementCalendarViewDate.getMonth() + offset,
             1
         );
-        positionAnnouncementCalendar();
         renderAnnouncementCalendar();
     }
 
@@ -794,11 +778,6 @@
                     shiftAnnouncementCalendarMonth(1);
                 });
             }
-
-            window.addEventListener('resize', () => {
-                if (!announcementCalendarVisible) return;
-                positionAnnouncementCalendar();
-            }, { passive: true });
         }
     }
 
@@ -830,7 +809,6 @@
         if (announcementsCache.length === 0) {
             popupList.style.display = 'none';
             popupEmpty.style.display = 'block';
-            positionAnnouncementCalendar();
             return;
         }
 
@@ -852,8 +830,6 @@
                 </div>
             `;
         }).join('');
-
-        positionAnnouncementCalendar();
     }
 
     // ---- Show Announcement Detail ----

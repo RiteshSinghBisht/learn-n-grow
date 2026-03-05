@@ -770,7 +770,7 @@ select {
   top: calc(100% + 8px);
   right: 0;
   width: 360px;
-  max-height: 480px;
+  max-height: min(84vh, 760px);
   background: var(--bg-card);
   box-shadow: var(--shadow-lg), 0 10px 40px rgba(0, 0, 0, 0.12);
   border: 1px solid var(--border-light);
@@ -779,7 +779,8 @@ select {
   flex-direction: column;
   z-index: 300;
   animation: dropIn 0.2s var(--ease);
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .announcement-popup.open {
@@ -829,7 +830,8 @@ select {
 }
 
 .announcement-popup-list {
-  flex: 1;
+  flex: 0 0 auto;
+  max-height: 220px;
   overflow-y: auto;
   padding: 8px;
 }
@@ -887,20 +889,10 @@ select {
     max-height: 70vh;
     right: 0;
   }
-
-  .nav-right .announcement-calendar-card {
-    width: min(360px, calc(100vw - 20px));
-    right: 0;
-  }
 }
 
 @media (max-width: 480px) {
   .announcement-popup {
-    width: calc(100vw - 16px);
-    right: -4px;
-  }
-
-  .nav-right .announcement-calendar-card {
     width: calc(100vw - 16px);
     right: -4px;
   }
@@ -1433,15 +1425,30 @@ select {
 /* ===========================
    CALENDAR - APPLE STYLE
    =========================== */
-.announcement-calendar-card {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 220px);
-  width: 380px;
-  max-width: min(380px, calc(100vw - 20px));
+.announcement-popup .announcement-calendar-card {
+  position: relative;
+  width: 100%;
+  max-width: none;
   margin: 0;
-  border: 1px solid var(--border-light);
-  z-index: 280;
+  border: 0;
+  border-top: 1px solid var(--border-light);
+  border-radius: 0;
+  box-shadow: none;
+  background: var(--bg-primary);
+  padding: 14px 14px 16px;
+}
+
+.announcement-popup .calendar-nav {
+  margin-bottom: 10px;
+}
+
+.announcement-popup .calendar-weekdays span {
+  padding: 6px 0;
+}
+
+.announcement-popup .calendar-day {
+  min-height: 38px;
+  font-size: 15px;
 }
 
 .calendar-card {

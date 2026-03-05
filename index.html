@@ -358,7 +358,7 @@
       <div class="nav-right">
         <!-- Announcement Bell -->
         <button class="nav-bell" id="announcement-bell" title="Announcements" style="display:flex;">
-          <i data-lucide="bell" style="width:20px;height:20px;"></i>
+          <i data-lucide="bell" style="width:26px;height:26px;"></i>
           <span class="nav-bell-badge" id="announcement-badge" style="display:none;">0</span>
         </button>
         <!-- Announcement Popup -->
@@ -375,28 +375,28 @@
           <div class="announcement-popup-empty" id="announcement-popup-empty" style="display:none;">
             <p>No announcements yet</p>
           </div>
+          <section class="calendar-card announcement-calendar-card" id="announcement-calendar-card" style="display:none;">
+            <div class="calendar-nav">
+              <button class="calendar-nav-btn" id="announcement-calendar-prev" aria-label="Previous month">
+                <i data-lucide="chevron-left" style="width:16px;height:16px;"></i>
+              </button>
+              <div class="calendar-month-label" id="announcement-calendar-month">Month YYYY</div>
+              <button class="calendar-nav-btn" id="announcement-calendar-next" aria-label="Next month">
+                <i data-lucide="chevron-right" style="width:16px;height:16px;"></i>
+              </button>
+            </div>
+            <div class="calendar-weekdays">
+              <span>Sun</span>
+              <span>Mon</span>
+              <span>Tue</span>
+              <span>Wed</span>
+              <span>Thu</span>
+              <span>Fri</span>
+              <span>Sat</span>
+            </div>
+            <div class="calendar-days" id="announcement-calendar-days"></div>
+          </section>
         </div>
-        <section class="calendar-card announcement-calendar-card" id="announcement-calendar-card" style="display:none;">
-          <div class="calendar-nav">
-            <button class="calendar-nav-btn" id="announcement-calendar-prev" aria-label="Previous month">
-              <i data-lucide="chevron-left" style="width:16px;height:16px;"></i>
-            </button>
-            <div class="calendar-month-label" id="announcement-calendar-month">Month YYYY</div>
-            <button class="calendar-nav-btn" id="announcement-calendar-next" aria-label="Next month">
-              <i data-lucide="chevron-right" style="width:16px;height:16px;"></i>
-            </button>
-          </div>
-          <div class="calendar-weekdays">
-            <span>Sun</span>
-            <span>Mon</span>
-            <span>Tue</span>
-            <span>Wed</span>
-            <span>Thu</span>
-            <span>Fri</span>
-            <span>Sat</span>
-          </div>
-          <div class="calendar-days" id="announcement-calendar-days"></div>
-        </section>
         <div class="nav-profile" id="nav-profile-trigger">
           <span class="nav-name" id="nav-student-name">Ritesh</span>
           <div class="avatar" id="nav-avatar">RS</div>
