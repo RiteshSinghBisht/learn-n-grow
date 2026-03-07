@@ -2632,6 +2632,32 @@ select {
   margin-bottom: var(--s-6);
 }
 
+.test-selector-modal-box {
+  max-width: 560px;
+  max-height: min(86vh, 820px);
+  display: flex;
+  flex-direction: column;
+}
+
+.test-selector-content {
+  overflow-y: auto;
+  padding-right: 4px;
+  margin-right: -4px;
+}
+
+.test-selector-group + .test-selector-group {
+  margin-top: var(--s-6);
+}
+
+.test-selector-group-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: var(--s-3);
+}
+
 .modal-actions {
   display: flex;
   gap: var(--s-3);
@@ -2676,11 +2702,13 @@ select {
   font-size: 14px;
   font-weight: 600;
   color: var(--text-heading);
+  line-height: 1.4;
 }
 
 .test-selector-btn small {
   font-size: 12px;
   color: var(--text-muted);
+  line-height: 1.5;
 }
 
 /* ===========================

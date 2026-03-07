@@ -861,24 +861,26 @@
      TEST SELECTOR MODAL
      =========================== -->
   <div class="modal-overlay" id="test-selector-modal">
-    <div class="modal-box">
+    <div class="modal-box test-selector-modal-box">
       <h3>Select a Test</h3>
-      <p class="modal-sub">Choose which test you want to start.</p>
-      <div class="test-selector-options">
-        <button class="test-selector-btn" id="select-self-assessment" type="button">
-          <span>
-            <strong>Self Assessment</strong>
-            <small>30 questions level test</small>
-          </span>
-          <i data-lucide="arrow-right" style="width:16px;height:16px;"></i>
-        </button>
-        <button class="test-selector-btn" id="select-test-series" type="button">
-          <span>
-            <strong>Test Series</strong>
-            <small>Past Modals and upcoming tests</small>
-          </span>
-          <i data-lucide="arrow-right" style="width:16px;height:16px;"></i>
-        </button>
+      <p class="modal-sub">Choose which test you want to start or continue.</p>
+      <div class="test-selector-content">
+        <div class="test-selector-group">
+          <p class="test-selector-group-label">Assessment</p>
+          <div class="test-selector-options">
+            <button class="test-selector-btn" id="select-self-assessment" type="button">
+              <span>
+                <strong>Self Assessment</strong>
+                <small>30 questions level test</small>
+              </span>
+              <i data-lucide="arrow-right" style="width:16px;height:16px;"></i>
+            </button>
+          </div>
+        </div>
+        <div class="test-selector-group">
+          <p class="test-selector-group-label">Test Series</p>
+          <div class="test-selector-options" id="test-series-list"></div>
+        </div>
       </div>
       <div class="modal-actions">
         <button type="button" class="btn-ghost" id="test-selector-close">Close</button>
@@ -934,8 +936,8 @@
   <div class="toast" id="toast"></div>
 
   <script src="daily-data.js"></script>
-  <script src="activity-data.js"></script>
-  <script src="app.js?v=8"></script>
+  <script src="activity-data.js?v=5"></script>
+  <script src="app.js?v=11"></script>
 </body>
 
 </html>

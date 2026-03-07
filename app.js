@@ -376,8 +376,14 @@
     // ---- Navigation ----
     function navigateTo(page) {
         const isActivityPage = page === 'activity-modals-have' || page === 'activity-level-assessment';
-        if (isActivityPage) {
-            ACTIVITY_SET_ID = ACTIVITY_ROUTE_TO_SET[page] || ACTIVITY_ROUTE_TO_SET['activity-modals-have'];
+        if (page === 'activity-level-assessment') {
+            ACTIVITY_SET_ID = ACTIVITY_ROUTE_TO_SET[page];
+        }
+        if (page === 'activity-modals-have') {
+            const currentSet = typeof ACTIVITY_SETS !== 'undefined' ? ACTIVITY_SETS[ACTIVITY_SET_ID] : null;
+            if (!currentSet || currentSet.group !== 'test_series') {
+                ACTIVITY_SET_ID = ACTIVITY_ROUTE_TO_SET[page] || ACTIVITY_ROUTE_TO_SET['activity-modals-have'];
+            }
         }
 
         // Both activity routes share the same visual page shell.
@@ -884,6 +890,17 @@
         return ACTIVITY_SETS[ACTIVITY_SET_ID] || null;
     }
 
+    function getTestSeriesSets() {
+        if (typeof ACTIVITY_SETS === 'undefined') return [];
+        return Object.values(ACTIVITY_SETS)
+            .filter(set => set && set.group === 'test_series')
+            .sort((a, b) => {
+                const orderDiff = (a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER);
+                if (orderDiff !== 0) return orderDiff;
+                return (a.title || '').localeCompare(b.title || '');
+            });
+    }
+
     function isModalsActivity(set = getActivitySet()) {
         return !!set && set.id === 'modals_have_v1';
     }
@@ -906,7 +923,7 @@
         const section = Array.isArray(set.sections)
             ? set.sections.find(s => Array.isArray(s.questions) && s.questions.includes(question.id))
             : null;
-        return section?.name || 'Self Assessment';
+        return section?.name || question.category || set.contextLabel || set.navTitle || set.title || 'Practice';
     }
 
     function getContextStyle(label) {
@@ -918,6 +935,7 @@
 
         const type = getQuestionType(question);
         if (type === 'modal_phrase') return question.expectedPhrase || '';
+        if (question.displayAnswer) return question.displayAnswer;
 
         if (type === 'multiple_choice' && Array.isArray(question.options) && Number.isInteger(question.correctAnswer)) {
             return question.options[question.correctAnswer] || '';
@@ -928,6 +946,102 @@
             return question.normalizedAnswers[0];
         }
         return '';
+    }
+
+    function getActivityTopicLabel(set = getActivitySet()) {
+        if (!set) return '';
+        return String(set.contextLabel || set.navTitle || set.title || '').toLowerCase();
+    }
+
+    function getQuestionOptionSummary(question) {
+        if (!Array.isArray(question?.options) || question.options.length === 0) return '';
+        return question.options.map(option => String(option)).join(' / ');
+    }
+
+    function getPromptTimeClue(prompt = '') {
+        const normalizedPrompt = String(prompt).toLowerCase();
+        const timeClues = [
+            'right now',
+            'yesterday evening',
+            'yesterday',
+            'last night',
+            'last weekend',
+            'since 2022',
+            'since last year',
+            'since yesterday',
+            'this week',
+            'this month',
+            'every day',
+            'every morning',
+            'every winter',
+            'by next week',
+            'by tomorrow evening',
+            'by tomorrow',
+            'by 2030',
+            'tomorrow at noon',
+            'tomorrow',
+            'when the guests arrived',
+            'when the thief came',
+            'during the storm'
+        ];
+
+        return timeClues.find(clue => normalizedPrompt.includes(clue)) || '';
+    }
+
+    function getGeneratedQuestionHint(question, set = getActivitySet()) {
+        if (!question || !set) return 'Review the sentence carefully and choose the best answer.';
+
+        const topic = getActivityTopicLabel(set);
+        const type = getQuestionType(question);
+        const optionsSummary = getQuestionOptionSummary(question);
+        const verbHint = extractVerbFromPrompt(question.prompt);
+        const timeClue = getPromptTimeClue(question.prompt);
+
+        if (type === 'fill_blank') {
+            if (topic.includes('subject-verb')) {
+                const verbPart = verbHint ? ` Use the correct form of "${verbHint}"` : '';
+                return `Find the main subject before the blank and ignore extra phrases like "of", "along with", or "as well as".${verbPart} so it agrees with the subject.`;
+            }
+
+            if (topic.includes('mix tenses')) {
+                const cluePart = timeClue ? ` The time clue "${timeClue}" tells you which tense to use.` : '';
+                const verbPart = verbHint ? ` Write the correct tense form of "${verbHint}".` : '';
+                return `Look for the time marker and decide whether the sentence talks about the present, past, or future.${cluePart}${verbPart}`;
+            }
+
+            const verbPart = verbHint ? ` Use the correct form of "${verbHint}".` : '';
+            return `Read the whole sentence for grammar clues before filling the blank.${verbPart}`;
+        }
+
+        if (type === 'multiple_choice') {
+            if (topic.includes('pronoun')) {
+                return `Check what job the blank is doing in the sentence: subject, object, possession, or reflexive form. Then choose from ${optionsSummary}.`;
+            }
+
+            if (topic.includes('adjectives and adverbs')) {
+                return `Decide whether the blank needs a describing word, an adverb, or a comparative/superlative form. Then choose from ${optionsSummary}.`;
+            }
+
+            if (topic.includes('preposition')) {
+                return `Focus on the relationship in the sentence: place, time, direction, or manner. Then choose the best preposition from ${optionsSummary}.`;
+            }
+
+            if (topic.includes('conjunction')) {
+                return `Think about the link between the two parts of the sentence: contrast, reason, choice, condition, or addition. Then choose from ${optionsSummary}.`;
+            }
+
+            if (topic.includes('modal')) {
+                return `Decide whether the sentence shows advice, permission, ability, possibility, or obligation. Then choose the modal that fits best from ${optionsSummary}.`;
+            }
+
+            if (topic.includes('determiner')) {
+                return `Check whether the noun needs an article, quantity word, or pointing word. Then choose the correct determiner from ${optionsSummary}.`;
+            }
+
+            return `Read the full sentence and choose the option that makes both the grammar and meaning correct: ${optionsSummary}.`;
+        }
+
+        return 'Review the sentence carefully and choose the best answer.';
     }
 
     function isActivityAnswerSubmitted(answer) {
@@ -1584,6 +1698,7 @@
     function toggleCurrentHint() {
         const question = getCurrentActivityQuestion();
         const hintBox = $('#hint-box');
+        const set = getActivitySet();
         if (!question || !hintBox) return;
 
         if (!hintBox.classList.contains('hidden')) {
@@ -1596,7 +1711,7 @@
         if (isModalsActivity()) {
             hint = ACTIVITY_HINTS[question.category] || 'Use the category clue to choose the correct modal phrase.';
         } else {
-            hint = question.explanation || 'Review the sentence carefully and select the best answer.';
+            hint = question.hint || question.explanation || getGeneratedQuestionHint(question, set);
         }
 
         hintBox.textContent = `Tip: ${hint}`;
@@ -3081,13 +3196,40 @@
         const trigger = $('#test-trigger');
         const closeBtn = $('#test-selector-close');
         const selfAssessmentBtn = $('#select-self-assessment');
-        const testSeriesBtn = $('#select-test-series');
+        const testSeriesList = $('#test-series-list');
 
         const closeModal = () => modal?.classList.remove('open');
         const openModal = () => modal?.classList.add('open');
+        const openActivitySet = setId => {
+            if (!setId || !ACTIVITY_SETS?.[setId]) return;
+            ACTIVITY_SET_ID = setId;
+            closeModal();
+            navigateTo('activity-modals-have');
+        };
+        const renderTestSeriesOptions = () => {
+            if (!testSeriesList) return;
+
+            const testSeriesSets = getTestSeriesSets();
+            testSeriesList.innerHTML = testSeriesSets.map(set => `
+                <button class="test-selector-btn" type="button" data-activity-set="${escapeHTML(set.id)}">
+                    <span>
+                        <strong>${escapeHTML(set.title || 'Test Series')}</strong>
+                        <small>${escapeHTML(set.selectorDescription || `${set.totalQuestions || 0} questions`)}</small>
+                    </span>
+                    <i data-lucide="arrow-right" style="width:16px;height:16px;"></i>
+                </button>
+            `).join('');
+
+            $$('[data-activity-set]', testSeriesList).forEach(button => {
+                button.addEventListener('click', () => openActivitySet(button.dataset.activitySet));
+            });
+
+            if (window.lucide) lucide.createIcons();
+        };
 
         trigger?.addEventListener('click', e => {
             e.preventDefault();
+            renderTestSeriesOptions();
             openModal();
         });
 
@@ -3100,11 +3242,6 @@
         selfAssessmentBtn?.addEventListener('click', () => {
             closeModal();
             navigateTo('activity-level-assessment');
-        });
-
-        testSeriesBtn?.addEventListener('click', () => {
-            closeModal();
-            navigateTo('activity-modals-have');
         });
     }
 
