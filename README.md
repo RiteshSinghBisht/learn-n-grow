@@ -1,95 +1,102 @@
 # Learn N Grow
 
-AI-powered English communication coaching web app with two chat assistants:
+AI-powered English communication coaching app with two guided chat experiences:
 
-- `Fluent 24*7` for grammar guidance
-- `Khushi` for conversational practice with voice support
+- `Fluent` for grammar-focused help
+- `Khushi` for conversation practice and speaking confidence
 
-## Features
+## Core Features
 
-- Email/password authentication with Firebase Auth
-- Dashboard with learning stats and daily language content
-- Dual chat experiences (grammar + conversation)
-- Voice recording and playback in chat
-- Webhook-based AI responses via n8n
-- Feedback form webhook integration
-- Profile management (name/photo/password)
+- Email/password authentication
+- Personalized dashboard with stats and daily learning content
+- Dual chat flows (grammar + conversation)
+- Voice recording and voice message playback
+- n8n webhook integration for bot responses and feedback routing
+- Profile management (name, photo, password, sign out)
+- In-app account deletion flow
+- Public privacy policy and account deletion pages for Play Console compliance
 
-## Tech Stack
+## Stack
 
 - HTML, CSS, JavaScript (vanilla)
-- Firebase (Auth, Firestore, Hosting)
-- n8n webhooks for AI workflow orchestration
-- Lucide icons + Chart.js
+- Firebase Auth + Firestore
+- Supabase (announcements source)
+- Capacitor Android wrapper for Play Store packaging
+- Firebase Hosting / Vercel for static deployment
 
-## Project Structure
+## Main Files
 
 ```text
 .
 ├── index.html
 ├── styles.css
 ├── app.js
-├── daily-data.js
+├── privacy-policy.html
+├── account-deletion.html
+├── service-worker.js
+├── manifest.webmanifest
 ├── firebase-config.js
+├── supabase-config.js
+├── scripts/build-web.mjs
 ├── firebase.json
-├── firestore.rules
-├── firestore.indexes.json
-└── assets (*.png)
+└── android/
 ```
 
-## Local Development
-
-Because this is a static frontend project, run it with a local HTTP server:
+## Local Run
 
 ```bash
-# Option 1: Python
-python3 -m http.server 5500
-
-# Option 2: Node
-npx serve -l 5500 .
+npm install
+npm run build
+npm run serve
 ```
 
-Open `http://localhost:5500`.
+Then open `http://localhost:5500`.
 
-## Configuration
-
-### 1. Firebase
-
-Update `firebase-config.js` with your Firebase project credentials.
-
-### 2. Webhooks
-
-Webhook endpoints are defined in `app.js`:
-
-- New user onboarding webhook
-- Fluent bot webhook
-- Khushi bot webhook
-- Feedback webhook
-
-Replace these with your own n8n endpoints for production.
-
-## Deployment (Firebase Hosting)
+## Build + Android Packaging
 
 ```bash
-firebase login
-firebase use <your-project-id>
-firebase deploy
+npm run build
+npm run cap:sync
+npm run android:open
 ```
 
-`firebase.json` is already configured for SPA routing (all paths rewrite to `index.html`).
+Release bundle output (after Android Studio signed build):
 
-## Security Notes
+```text
+android/app/release/app-release.aab
+```
 
-- Review `firestore.rules` before production rollout.
-- Ensure webhook URLs are production-safe and authenticated where needed.
+## Play Console URLs
 
-## Contributing
+- Privacy policy: `https://learn-n-grow-7ef71.web.app/privacy-policy.html`
+- Account deletion page: `https://learn-n-grow-7ef71.web.app/account-deletion.html`
+- In-app deletion path: `Profile > Delete Account`
 
-1. Create a branch from `main`
-2. Make your changes
-3. Commit with a clear message
-4. Open a pull request
+## Deployment
+
+### Firebase Hosting
+
+```bash
+npm run build
+firebase deploy --only hosting
+```
+
+`firebase.json` serves from `dist/` and rewrites routes to `index.html`.
+
+### Vercel
+
+```bash
+vercel deploy --prod
+```
+
+If prompted, choose the existing linked project and deploy from repo root.
+
+## Configuration Notes
+
+- Firebase client config is in `firebase-config.js`
+- Webhook endpoints are in `app.js`
+- Review `firestore.rules` before production use
 
 ## License
 
-This project is licensed under the MIT License. See `LICENSE`.
+MIT (`LICENSE`)

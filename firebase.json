@@ -10,7 +10,7 @@
     "codebase": "default"
   },
   "hosting": {
-    "public": ".",
+    "public": "dist",
     "ignore": [
       "firebase.json",
       ".git/**",

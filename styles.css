@@ -972,12 +972,12 @@ select {
    HERO / WELCOME SECTION
    =========================== */
 .welcome-section {
-  margin-bottom: var(--s-16);
+  margin-bottom: var(--s-12);
   animation: fadeUp 0.5s var(--ease);
   background: linear-gradient(135deg, rgba(59, 130, 246, 0.04), rgba(139, 92, 246, 0.04));
   border: 1px solid var(--border);
   border-radius: var(--r-xl);
-  padding: var(--s-8);
+  padding: var(--s-6);
   box-shadow: var(--shadow-card);
 }
 
@@ -1002,7 +1002,7 @@ select {
 }
 
 .welcome-divider {
-  margin-top: var(--s-8);
+  margin-top: var(--s-6);
   height: 1px;
   background: linear-gradient(90deg, var(--border), transparent);
 }
@@ -2665,6 +2665,64 @@ select {
   justify-content: flex-end;
 }
 
+.delete-account-warning {
+  padding: var(--s-4);
+  border-radius: var(--r-lg);
+  border: 1px solid rgba(239, 68, 68, 0.12);
+  background: rgba(239, 68, 68, 0.04);
+  margin-bottom: var(--s-5);
+}
+
+.delete-account-warning p {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.delete-account-warning ul {
+  margin: var(--s-3) 0 var(--s-3) 18px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.delete-account-warning li + li {
+  margin-top: 6px;
+}
+
+.delete-account-note {
+  color: var(--text-muted) !important;
+}
+
+.delete-account-email {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  border-radius: var(--r-lg);
+  border: 1px solid var(--border);
+  background: var(--bg-base);
+  color: var(--text-heading);
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.delete-account-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: var(--s-2);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.delete-account-check input {
+  margin-top: 3px;
+}
+
+.delete-account-submit {
+  width: auto;
+  min-width: 180px;
+}
+
 .test-selector-options {
   display: flex;
   flex-direction: column;
@@ -3485,6 +3543,50 @@ select {
   align-items: center;
 }
 
+.profile-link-grid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s-3);
+}
+
+.profile-link-grid > :only-child {
+  grid-column: 1 / -1;
+}
+
+.profile-link-button {
+  width: 100%;
+  text-align: center;
+  text-decoration: none;
+}
+
+.profile-danger-button {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-2);
+  padding: 12px 18px;
+  border-radius: var(--r-xl);
+  border: 1px solid rgba(239, 68, 68, 0.22);
+  background: rgba(239, 68, 68, 0.06);
+  color: var(--danger);
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background var(--t-fast), border-color var(--t-fast), transform var(--t-fast);
+}
+
+.profile-danger-button:hover {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.32);
+}
+
+.profile-danger-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 /* Change Password */
 .change-pw-form {
   display: none;
@@ -3697,7 +3799,8 @@ select {
   }
 
   .welcome-section {
-    margin-bottom: var(--s-10);
+    margin-bottom: var(--s-8);
+    padding: var(--s-5);
   }
 
   .stat-card .stat-value {

@@ -49,6 +49,7 @@
     let currentUid = null;
     let activityState = null;
     let activityEditingQuestionId = null;
+    let pendingAccountActionToast = '';
 
     // ---- Announcements State ----
     let announcementsCache = [];
@@ -63,6 +64,55 @@
     };
     let ACTIVITY_SET_ID = ACTIVITY_ROUTE_TO_SET['activity-modals-have'];
     const ACTIVITY_VERSION = 1;
+    const VALID_APP_PAGES = new Set([
+        'auth',
+        'dashboard',
+        'chat-fluent',
+        'chat-khushi',
+        'activity-modals-have',
+        'activity-level-assessment',
+        'profile'
+    ]);
+
+    function normalizeRoute(page) {
+        return VALID_APP_PAGES.has(page) ? page : null;
+    }
+
+    function getRouteFromHash() {
+        return normalizeRoute(window.location.hash.replace(/^#/, '').trim());
+    }
+
+    function getInitialAuthenticatedRoute() {
+        const requestedRoute = getRouteFromHash();
+        if (!requestedRoute || requestedRoute === 'auth') return 'dashboard';
+        return requestedRoute;
+    }
+
+    function updateHistoryForPage(page, replaceHistory = false) {
+        const nextHash = `#${page}`;
+        const currentHash = window.location.hash || '#';
+        const currentStatePage = history.state?.lgPage || null;
+
+        if (!replaceHistory && currentHash === nextHash && currentStatePage === page) return;
+
+        const method = replaceHistory ? 'replaceState' : 'pushState';
+        history[method]({ lgPage: page }, '', nextHash);
+    }
+
+    function initAppHistory() {
+        if ('scrollRestoration' in history) {
+            history.scrollRestoration = 'manual';
+        }
+
+        window.addEventListener('popstate', event => {
+            const requestedRoute = normalizeRoute(event.state?.lgPage) || getRouteFromHash() || 'auth';
+            const nextRoute = currentUser ? requestedRoute : 'auth';
+            navigateTo(nextRoute, {
+                skipHistory: true,
+                skipSessionIncrement: true
+            });
+        });
+    }
 
     // ---- Firestore Helpers ----
     function getUserDocRef() {
@@ -93,9 +143,7 @@
                 };
 
                 // Clear temp storage
-                localStorage.removeItem('temp_signup_phone');
-                localStorage.removeItem('temp_signup_firstname');
-                localStorage.removeItem('temp_signup_lastname');
+                clearTempSignupStorage();
 
                 await ref.set(defaults);
 
@@ -161,6 +209,30 @@
         } catch (err) {
             console.error('Firestore write error:', err);
         }
+    }
+
+    function clearTempSignupStorage() {
+        localStorage.removeItem('temp_signup_phone');
+        localStorage.removeItem('temp_signup_firstname');
+        localStorage.removeItem('temp_signup_lastname');
+    }
+
+    async function deleteCurrentAccount(password) {
+        const authUser = auth.currentUser;
+        if (!authUser) {
+            throw new Error('No active account found.');
+        }
+
+        if (!authUser.email) {
+            throw new Error('Account deletion is only available for email/password accounts right now.');
+        }
+
+        const credential = firebase.auth.EmailAuthProvider.credential(authUser.email, password);
+        await authUser.reauthenticateWithCredential(credential);
+        await db.collection('users').doc(authUser.uid).delete();
+        clearTempSignupStorage();
+        await authUser.delete();
+        pendingAccountActionToast = 'Account deleted permanently.';
     }
 
     // ---- Daily Content (Local Static) ----
@@ -299,6 +371,7 @@
         lucide.createIcons();
         initAuth();
         initNav();
+        initAppHistory();
         initActivity();
         initChat();
         initVoice();
@@ -347,14 +420,24 @@
                     }
                 }
 
-                navigateTo('dashboard');
+                navigateTo(getInitialAuthenticatedRoute(), {
+                    replaceHistory: true,
+                    skipSessionIncrement: true
+                });
             } else {
                 currentUser = null;
                 currentUid = null;
                 activityState = null;
                 activityEditingQuestionId = null;
                 stopAnnouncementsAutoRefresh();
-                navigateTo('auth');
+                navigateTo('auth', {
+                    replaceHistory: true,
+                    skipSessionIncrement: true
+                });
+                if (pendingAccountActionToast) {
+                    showToast(pendingAccountActionToast);
+                    pendingAccountActionToast = '';
+                }
             }
 
             // Auth state resolved — hide the loader
@@ -374,7 +457,13 @@
     }
 
     // ---- Navigation ----
-    function navigateTo(page) {
+    function navigateTo(page, options = {}) {
+        const {
+            replaceHistory = false,
+            skipHistory = false,
+            skipSessionIncrement = false
+        } = options;
+        page = normalizeRoute(page) || (currentUser ? 'dashboard' : 'auth');
         const isActivityPage = page === 'activity-modals-have' || page === 'activity-level-assessment';
         if (page === 'activity-level-assessment') {
             ACTIVITY_SET_ID = ACTIVITY_ROUTE_TO_SET[page];
@@ -399,6 +488,9 @@
         if (target) {
             target.classList.add('active');
             currentPage = page;
+            if (!skipHistory) {
+                updateHistoryForPage(page, replaceHistory);
+            }
         }
 
         if (page !== 'dashboard') {
@@ -415,10 +507,10 @@
             // Re-trigger scroll animations
             setTimeout(() => triggerScrollAnimations(), 100);
         }
-        if (page === 'chat-fluent') {
+        if (page === 'chat-fluent' && !skipSessionIncrement) {
             incrementSession('fluent');
         }
-        if (page === 'chat-khushi') {
+        if (page === 'chat-khushi' && !skipSessionIncrement) {
             incrementSession('khushi');
         }
         if (isActivityPage) {
@@ -3249,6 +3341,27 @@
     function initProfile() {
         const toggle = $('#change-pw-toggle');
         const pwForm = $('#change-pw-form');
+        const deleteModal = $('#delete-account-modal');
+        const deleteForm = $('#delete-account-form');
+        const deletePassword = $('#delete-account-password');
+        const deleteConsent = $('#delete-account-consent');
+        const deleteSubmit = $('#delete-account-submit');
+        const deleteEmail = $('#delete-account-email');
+
+        const closeDeleteModal = () => {
+            deleteModal?.classList.remove('open');
+            deleteForm?.reset();
+        };
+
+        const openDeleteModal = () => {
+            if (deleteEmail) {
+                deleteEmail.textContent = currentUser?.email || 'No email available';
+            }
+            if (deletePassword) deletePassword.value = '';
+            if (deleteConsent) deleteConsent.checked = false;
+            deleteModal?.classList.add('open');
+            deletePassword?.focus();
+        };
 
         toggle?.addEventListener('click', () => {
             pwForm.classList.toggle('open');
@@ -3277,6 +3390,47 @@
 
         $('#profile-logout')?.addEventListener('click', () => {
             logout();
+        });
+
+        $('#profile-delete-trigger')?.addEventListener('click', openDeleteModal);
+        $('#delete-account-cancel')?.addEventListener('click', closeDeleteModal);
+
+        deleteModal?.addEventListener('click', e => {
+            if (e.target === deleteModal) closeDeleteModal();
+        });
+
+        deleteForm?.addEventListener('submit', async e => {
+            e.preventDefault();
+
+            if (!deleteConsent?.checked) {
+                showToast('Please confirm that you understand this action is permanent.');
+                return;
+            }
+
+            const password = deletePassword?.value?.trim() || '';
+            if (!password) {
+                showToast('Enter your current password to continue.');
+                return;
+            }
+
+            const originalText = deleteSubmit?.textContent || 'Delete Permanently';
+            if (deleteSubmit) {
+                deleteSubmit.disabled = true;
+                deleteSubmit.textContent = 'Deleting...';
+            }
+
+            try {
+                await deleteCurrentAccount(password);
+                closeDeleteModal();
+            } catch (error) {
+                console.error('Account deletion failed:', error);
+                showToast(getFriendlyErrorMessage(error.code) || error.message || 'Could not delete account.');
+            } finally {
+                if (deleteSubmit) {
+                    deleteSubmit.disabled = false;
+                    deleteSubmit.textContent = originalText;
+                }
+            }
         });
 
         // ---- Photo Upload ----
@@ -3448,6 +3602,8 @@
                 return 'Too many attempts. Please try again later.';
             case 'auth/operation-not-allowed':
                 return 'Operation not allowed. Please contact support.';
+            case 'auth/requires-recent-login':
+                return 'Please sign in again and retry account deletion.';
             default:
                 return 'An error occurred. Please try again.';
         }

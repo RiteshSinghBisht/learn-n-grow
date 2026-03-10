@@ -20,6 +20,10 @@ const app = firebase.initializeApp(firebaseConfig);
 // Initialize Services
 const auth = firebase.auth();
 const db = firebase.firestore();
+window.LEARN_N_GROW_FIREBASE_CONFIG = firebaseConfig;
+window.firebaseApp = app;
+window.auth = auth;
+window.db = db;
 
 // Console log to confirm init (can be removed later)
 console.log("Firebase initialized:", app.name);

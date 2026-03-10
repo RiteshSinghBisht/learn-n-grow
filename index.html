@@ -8,6 +8,14 @@
   <title>Learn N Grow — English Communication Coaching</title>
   <meta name="description"
     content="Practice English with AI-powered conversation bots. Improve your grammar, fluency, and confidence." />
+  <meta name="theme-color" content="#3B82F6" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Learn N Grow" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" type="image/png" sizes="192x192" href="assets/icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="assets/icons/icon-512.png" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -161,9 +169,12 @@
       }
 
       .mic-btn,
-      .send-btn,
-      .rec-cancel-btn {
+      .send-btn {
         @apply inline-flex items-center justify-center rounded-full;
+      }
+
+      .rec-cancel-btn {
+        @apply hidden items-center justify-center rounded-full;
       }
 
       .profile-page {
@@ -852,7 +863,11 @@
               Password</button>
           </form>
         </div>
-        <button class="btn-danger-text" id="profile-logout" style="width:100%;text-align:center;">Sign Out</button>
+        <div class="profile-link-grid">
+          <a class="btn-ghost profile-link-button" href="privacy-policy.html" target="_blank" rel="noopener">Privacy Policy</a>
+        </div>
+        <button class="profile-danger-button" id="profile-delete-trigger" type="button">Delete Account</button>
+        <button class="btn-ghost" id="profile-logout" style="width:100%;text-align:center;">Sign Out</button>
       </div>
     </div>
   </div>
@@ -917,6 +932,39 @@
     </div>
   </div>
 
+  <div class="modal-overlay" id="delete-account-modal">
+    <div class="modal-box">
+      <h3>Delete Account</h3>
+      <p class="modal-sub">This permanently removes your Learn N Grow sign-in account and the profile data stored for it.</p>
+      <div class="delete-account-warning">
+        <p><strong>What will be deleted</strong></p>
+        <ul>
+          <li>Your Firebase sign-in account</li>
+          <li>Your Learn N Grow profile record, including name, phone number, profile photo, and saved learning stats</li>
+        </ul>
+        <p class="delete-account-note">Previously submitted chat content, voice uploads, feedback, or automation logs may remain in secure processor logs or backups for a limited period.</p>
+      </div>
+      <form id="delete-account-form" autocomplete="off">
+        <div class="form-group">
+          <label>Signed-in email</label>
+          <div class="delete-account-email" id="delete-account-email">your-email@example.com</div>
+        </div>
+        <div class="form-group">
+          <label for="delete-account-password">Confirm with password</label>
+          <input id="delete-account-password" type="password" class="input-field" placeholder="Enter your current password" required />
+        </div>
+        <label class="delete-account-check">
+          <input id="delete-account-consent" type="checkbox" />
+          <span>I understand this action is permanent and cannot be undone.</span>
+        </label>
+        <div class="modal-actions">
+          <button type="button" class="btn-ghost" id="delete-account-cancel">Cancel</button>
+          <button type="submit" class="profile-danger-button delete-account-submit" id="delete-account-submit">Delete Permanently</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
 
 
 
@@ -938,6 +986,15 @@
   <script src="daily-data.js"></script>
   <script src="activity-data.js?v=5"></script>
   <script src="app.js?v=11"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./service-worker.js').catch(error => {
+          console.warn('Service worker registration failed:', error);
+        });
+      });
+    }
+  </script>
 </body>
 
 </html>
